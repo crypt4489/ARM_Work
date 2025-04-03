@@ -35,6 +35,13 @@ defined in linker script */
 .word  _ebss
 /* stack used for SystemInit_ExtMemCtl; always internal RAM used */
 
+
+.equ RCC_AHB1ENR, 0x40023830
+.equ TIM9_BASE, 0x40014000
+.equ RCC_APB2RSTR, 0x40023824
+.equ RCC_APB2ENR, 0x40023844
+.equ EXTI, 0x40013c00
+
 	.section .text.BasicFunction
 	.weak BasicFunction
 	.type BasicFunction, %function
@@ -98,7 +105,13 @@ LoopFillZerobss:
 /* Call the application's entry point.*/
   BL HAL_Init
   BL SystemClock_Config
-  ldr r0, =0x40023830
+
+
+
+
+
+
+  ldr r0, =RCC_AHB1ENR
   ldr r1, [r0]
   orr r1, r1, #0x0001
   str r1, [r0]
@@ -114,28 +127,31 @@ LoopFillZerobss:
   BL HAL_GPIO_Init
   POP {r0, r1, r2, r3, r4}
   EOR r0, r0
-  LABEL:
-  LSL r1, r0, #5
-  PUSH { r0 }
-  MOV r0, #0x0000
-  MOVT r0, #0x4002
-  PUSH { r0 }
-  MOV r2, #0x0001
-  BL HAL_GPIO_WritePin //5
-  LDR r0, [sp, #4]
-  BL BasicFunction
-  MOV r1, r0
-  POP { r0 }
-  MOV r2, #0x0000
-  BL HAL_GPIO_WritePin //5
-  MOV r0, #1000
-  BL HAL_Delay
-  POP { r0 }
-  ADDW r0, r0, #1
-  AND r0, r0, #0x000f
-  b LABEL
+    ldr r0, =RCC_APB2ENR
+  ldr r1, [r0]
+  orr r1, r1, #0x10000
+  str r1, [r0]
+  ldr r0, =TIM9_BASE
+  //; Set Prescaler (PSC) → 1 µs tick with 84 MHz clock
+  MOV r1, #0xff00                   //; Prescaler = 83
+  STR r1, [r0, #0x28]             // ; Store PSC
 
-  bx  lr
+  // Set Auto-Reload (ARR) → 1 ms overflow
+  MOV r1, #1000                 // ARR = 999
+  STR r1, [r0, #0x2C]              // Store ARR
+  ldr r2, [r0, #0xc]
+  orr r2, r2, #0x0001
+  str r2, [r0, #0xc]
+  mov r2, #0
+  str r2, [r0, #8]
+  ldr r2, [r0]
+  orr r2, r2, #0x0001
+  str r2, [r0]
+  LDR r0, =0xE000E100
+  MOV r1, #1 << 24
+  STR r1, [r0]
+  LABEL:
+  b LABEL
 .size  AllBeginning, .-AllBeginning
 
 /**
@@ -150,6 +166,24 @@ Default_Handler:
 Infinite_Loop:
   b  Infinite_Loop
   .size  Default_Handler, .-Default_Handler
+
+
+  .section  .text.TIM9_Handler
+TIM9_Handler:
+	PUSH {r0-r1, lr}
+	LDR r0, =TIM9_BASE
+    LDR r1, [r0, #0x10]
+    BIC r1, r1, #0x0001
+    STR r1, [r0, #0x10]
+    LDR r0, =0xE000E280
+	MOV r1, #(1 << 24)
+	STR r1, [r0]
+	ldr r1, =0x00000020
+	ldr r0, =0x40020000
+	bl  HAL_GPIO_TogglePin
+	pop {r0-r1, lr}
+	bx lr
+  .size  TIM9_Handler, .-TIM9_Handler
 /******************************************************************************
 *
 * The minimal vector table for a Cortex M3. Note that the proper constructs
@@ -389,7 +423,7 @@ g_pfnVectors:
    .thumb_set EXTI9_5_IRQHandler,Default_Handler
 
    .weak      TIM1_BRK_TIM9_IRQHandler
-   .thumb_set TIM1_BRK_TIM9_IRQHandler,Default_Handler
+   .thumb_set TIM1_BRK_TIM9_IRQHandler,TIM9_Handler
 
    .weak      TIM1_UP_TIM10_IRQHandler
    .thumb_set TIM1_UP_TIM10_IRQHandler,Default_Handler
