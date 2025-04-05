@@ -38,11 +38,25 @@ defined in linker script */
 
 .equ RCC_AHB1ENR, 0x40023830
 .equ TIM9_BASE, 0x40014000
+.equ TIM9_CR1, 0x00
+.equ TIM9_SMCR, 0x08
+.equ TIM9_DIER, 0x0c
+.equ TIM9_SR, 0x10
+.equ TIM9_EGR, 0x14
+.equ TIM9_CCMR1, 0x18
+.equ TIM9_CCER, 0x20
+.equ TIM9_CNT, 0x24
+.equ TIM9_PSC, 0x28
+.equ TIM9_ARR, 0x2c
+.equ TIM9_CCR1, 0x34
+.equ TIM9_CCR2, 0x38
+.equ NVIC_ISER0, 0xE000E100 // interrupt enable nvic
 .equ RCC_APB2RSTR, 0x40023824
 .equ RCC_APB2ENR, 0x40023844
 .equ EXTI, 0x40013c00
+.equ NVIC_ICPR0, 0xE000E280 //clear pending nvic
 
-	.section .text.BasicFunction
+/*	.section .text.BasicFunction
 	.weak BasicFunction
 	.type BasicFunction, %function
  BasicFunction:
@@ -51,7 +65,100 @@ defined in linker script */
   AND r0, r0, #0x000f // r0 = r0 & 0x000f
   LSL r0, r0, #5     // r0 = r0 << 5
   BX lr              // Return from the function
-  .size  BasicFunction, .-BasicFunction
+  .size  BasicFunction, .-BasicFunction */
+
+    .section  .text.TIM9_Handler
+TIM9_Handler:
+	PUSH {r0-r1, lr}
+	LDR r0, =TIM9_BASE
+    LDR r1, [r0, TIM9_SR]
+    BIC r1, r1, #0x0001
+    STR r1, [r0, TIM9_SR]
+    LDR r0, =NVIC_ICPR0
+	MOV r1, #(1 << 24)
+	STR r1, [r0]
+	ldr r1, =0x00000020
+	ldr r0, =0x40020000
+	bl  HAL_GPIO_TogglePin
+	pop {r0-r1, lr}
+	bx lr
+  .size  TIM9_Handler, .-TIM9_Handler
+
+
+
+  	.section .text.ToggleHandler
+  	.weak ToggleHandler
+  	.type ToggleHandler, %function
+ ToggleHandler:
+  ldr r0, =RCC_APB2ENR 				//enable the tim9 clock
+  ldr r1, [r0]
+  orr r1, r1, #0x10000
+  str r1, [r0]
+  ldr r0, =TIM9_BASE
+  									//; Set Prescaler (PSC) → 1 µs tick with 84 MHz clock
+  mov r1, #0xff00                   //; Prescaler = 83
+  str r1, [r0, TIM9_PSC]            // ; Store PSC
+
+  									// Set Auto-Reload (ARR) → 1 ms overflow
+  mov r1, #1000                 	// ARR = 999
+  str r1, [r0, TIM9_ARR]             // Store ARR
+  ldr r2, [r0, TIM9_DIER]           //Interrupt Setting for TIM9
+  orr r2, r2, #0x0001
+  str r2, [r0, TIM9_DIER]
+  mov r2, #0
+  str r2, [r0, TIM9_SMCR] // disable slave mode
+  ldr r2, [r0] //TIM9_CR1 enable timer
+  orr r2, r2, #0x0001
+  str r2, [r0]
+  ldr r0, =NVIC_ISER0 // interrupt set enable for NVIC
+  mov r1, #1 << 24
+  str r1, [r0]
+  bx lr
+  	.size ToggleHandler, .-ToggleHandler
+
+
+  	.section .text.PWMTIM9
+  	.weak PWMTIM9
+  	.type PWMTIM9, %function
+PWMTIM9:
+  ldr r0, =RCC_APB2ENR 				//enable the tim9 clock
+  ldr r1, [r0]
+  orr r1, r1, #0x10000
+  str r1, [r0]
+  ldr r0, =TIM9_BASE
+
+  mov r1, #83                   //; Prescaler = 83
+  str r1, [r0, TIM9_PSC]            // ; Store PSC
+
+  									// Set Auto-Reload (ARR) → 1 ms overflow
+  mov r1, #999                	// ARR = 999
+  str r1, [r0, TIM9_ARR]             // Store ARR
+
+  mov r1, #500
+  str r1, [r0, TIM9_CCR1]
+
+
+  mov r1, #0x0068
+  str r1, [r0, TIM9_CCMR1]
+
+
+  ldr r2, [r0, TIM9_CCER]
+  orr r2, r2, #0x0001
+  str r2, [r0, TIM9_CCER] //TIM9_CCER ARP prenable
+
+  ldr r2, [r0, TIM9_EGR]  //TIM9_CR1 write to shadow regs
+  orr r2, r2, #0x0001
+  str r2, [r0, TIM9_EGR]
+
+
+  ldr r2, [r0]  //TIM9_CR1 enable timer
+  orr r2, r2, #0x0001
+  str r2, [r0]
+
+  bx lr
+
+  	.size PWMTIM9, .-PWMTIM9
+
 /**
  * @brief  This is the code that gets called when the processor first
  *          starts execution following a reset event. Only the absolutely
@@ -104,17 +211,34 @@ LoopFillZerobss:
   bl __libc_init_array
 /* Call the application's entry point.*/
   BL HAL_Init
+
   BL SystemClock_Config
 
 
-
-
-
-
-  ldr r0, =RCC_AHB1ENR
+  ldr r0, =RCC_AHB1ENR //gpio enable clock peripheral
   ldr r1, [r0]
   orr r1, r1, #0x0001
   str r1, [r0]
+
+  ldr r0, =#0x40020000
+  ldr r1, [r0]
+  bic r1, r1, #(0b11 << (2 * 2))   // Clear mode bits for PA2
+  orr r1, r1, #(0b10 << (2 * 2))  // Set to Alternate Function
+  str r1, [r0]
+
+  ldr r1, [r0, #0x20]       //; GPIOx_AFRL
+  bic r1, r1, #(0xF << (4 * 2))     //; Clear AF bits for PA2
+  orr r1, r1, #(0x3 << (4 * 2))     //; AF3 for TIM9_CH1
+  str r1, [r0, #0x20]
+
+  // (Optional) Enable pull-up for PA2
+ldr r1, [r0, #0x0C]      // GPIOA_PUPDR
+bic r1, r1, #(0b11 << 4) // Clear PA2 bits
+orr r1, r1, #(0b01 << 4) // Pull-up
+str r1, [r0, #0x0C]
+
+
+
   MOV r0, #0x01e0
   MOV r1, #0x0001
   MOV r2, #0x0001
@@ -126,31 +250,16 @@ LoopFillZerobss:
   MOVT r0, #0x4002
   BL HAL_GPIO_Init
   POP {r0, r1, r2, r3, r4}
-  EOR r0, r0
-    ldr r0, =RCC_APB2ENR
-  ldr r1, [r0]
-  orr r1, r1, #0x10000
-  str r1, [r0]
-  ldr r0, =TIM9_BASE
-  //; Set Prescaler (PSC) → 1 µs tick with 84 MHz clock
-  MOV r1, #0xff00                   //; Prescaler = 83
-  STR r1, [r0, #0x28]             // ; Store PSC
-
-  // Set Auto-Reload (ARR) → 1 ms overflow
-  MOV r1, #1000                 // ARR = 999
-  STR r1, [r0, #0x2C]              // Store ARR
-  ldr r2, [r0, #0xc]
-  orr r2, r2, #0x0001
-  str r2, [r0, #0xc]
-  mov r2, #0
-  str r2, [r0, #8]
-  ldr r2, [r0]
-  orr r2, r2, #0x0001
-  str r2, [r0]
-  LDR r0, =0xE000E100
-  MOV r1, #1 << 24
-  STR r1, [r0]
+  bl PWMTIM9
+  MOV r0, #0x0000
+  MOVT r0, #0x4002
+  mov r1, #0x0040
   LABEL:
+  PUSH { r0, r1 }
+  bl  HAL_GPIO_TogglePin
+  mov r0, #1000
+  bl HAL_Delay
+  POP { r0, r1 }
   b LABEL
 .size  AllBeginning, .-AllBeginning
 
@@ -168,22 +277,7 @@ Infinite_Loop:
   .size  Default_Handler, .-Default_Handler
 
 
-  .section  .text.TIM9_Handler
-TIM9_Handler:
-	PUSH {r0-r1, lr}
-	LDR r0, =TIM9_BASE
-    LDR r1, [r0, #0x10]
-    BIC r1, r1, #0x0001
-    STR r1, [r0, #0x10]
-    LDR r0, =0xE000E280
-	MOV r1, #(1 << 24)
-	STR r1, [r0]
-	ldr r1, =0x00000020
-	ldr r0, =0x40020000
-	bl  HAL_GPIO_TogglePin
-	pop {r0-r1, lr}
-	bx lr
-  .size  TIM9_Handler, .-TIM9_Handler
+
 /******************************************************************************
 *
 * The minimal vector table for a Cortex M3. Note that the proper constructs
@@ -421,6 +515,9 @@ g_pfnVectors:
 
    .weak      EXTI9_5_IRQHandler
    .thumb_set EXTI9_5_IRQHandler,Default_Handler
+
+   /*.weak      TIM1_BRK_TIM9_IRQHandler
+   .thumb_set TIM1_BRK_TIM9_IRQHandler,Default_Handler*/
 
    .weak      TIM1_BRK_TIM9_IRQHandler
    .thumb_set TIM1_BRK_TIM9_IRQHandler,TIM9_Handler

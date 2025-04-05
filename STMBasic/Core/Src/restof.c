@@ -4,7 +4,7 @@
  *  Created on: Mar 30, 2025
  *      Author: dflet
  */
-#include "main.h"
+
 #include "stm32f4xx_hal.h"
 static void Error_Handler(void);
 /**
@@ -76,6 +76,17 @@ void SystemClock_Config(void)
     Error_Handler();
   }
  // __HAL_RCC_GPIOA_CLK_ENABLE();
+
+   GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+   GPIO_InitStruct.Pin = GPIO_PIN_2;
+   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+   GPIO_InitStruct.Pull = GPIO_NOPULL;
+   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+   GPIO_InitStruct.Alternate = GPIO_AF3_TIM9;
+  //HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+   RCC->APB1ENR &= ~RCC_APB1ENR_USART2EN;
 }
 
 
