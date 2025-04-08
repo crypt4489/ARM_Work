@@ -84,9 +84,9 @@ void SystemClock_Config(void)
    GPIO_InitStruct.Pull = GPIO_NOPULL;
    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
    GPIO_InitStruct.Alternate = GPIO_AF3_TIM9;
-  //HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-   RCC->APB1ENR &= ~RCC_APB1ENR_USART2EN;
+  // RCC->APB1ENR &= ~RCC_APB1ENR_USART2EN;
 }
 
 

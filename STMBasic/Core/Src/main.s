@@ -52,9 +52,36 @@ defined in linker script */
 .equ TIM9_CCR2, 0x38
 .equ NVIC_ISER0, 0xE000E100 // interrupt enable nvic
 .equ RCC_APB2RSTR, 0x40023824
+.equ RCC_APB1ENR, 0x40023840
 .equ RCC_APB2ENR, 0x40023844
 .equ EXTI, 0x40013c00
 .equ NVIC_ICPR0, 0xE000E280 //clear pending nvic
+.equ GPIOA_BASE, 0x40020000
+.equ GPIOB_BASE, 0x40020400
+
+//tim4 registers
+.equ TIM4_BASE, 0x40000800
+.equ TIM4_CR1, 0x00
+.equ TIM4_CR2, 0x04
+.equ TIM4_SMCR, 0x08
+.equ TIM4_DIER, 0x0C
+.equ TIM4_SR, 0x10
+.equ TIM4_EGR, 0x14
+.equ TIM4_CCMR1, 0x18
+.equ TIM4_CCMR2, 0x1C
+.equ TIM4_CCER, 0x20
+.equ TIM4_CNT, 0x24
+.equ TIM4_PSC, 0x28
+.equ TIM4_ARR, 0x2C
+.equ TIM4_CCR1, 0x34
+.equ TIM4_CCR2, 0x38
+.equ TIM4_CCR3, 0x3C
+.equ TIM4_CCR4, 0x40
+.equ TIM4_DCR,  0x48
+.equ TIM4_DMAR, 0x4C
+
+
+
 
 /*	.section .text.BasicFunction
 	.weak BasicFunction
@@ -116,11 +143,23 @@ TIM9_Handler:
   bx lr
   	.size ToggleHandler, .-ToggleHandler
 
-
+// this fails because sb13 and sb14 are fused
   	.section .text.PWMTIM9
   	.weak PWMTIM9
   	.type PWMTIM9, %function
 PWMTIM9:
+
+  ldr r0, =GPIOA_BASE
+  ldr r1, [r0, #0x20]       //; GPIOx_AFRL
+  bic r1, r1, #(0xF << (4 * 3))     //; Clear AF bits for PA2
+  orr r1, r1, #(0x3 << (4 * 3))     //; AF3 for TIM9_CH1
+  str r1, [r0, #0x20]
+
+  ldr r1, [r0]
+  bic r1, r1, #(0b11 << (2 * 3))   // Clear PA3
+  orr r1, r1, #(0b10 << (2 * 3))   // Set PA3 to alternate function
+  str r1, [r0]
+
   ldr r0, =RCC_APB2ENR 				//enable the tim9 clock
   ldr r1, [r0]
   orr r1, r1, #0x10000
@@ -131,33 +170,155 @@ PWMTIM9:
   str r1, [r0, TIM9_PSC]            // ; Store PSC
 
   									// Set Auto-Reload (ARR) → 1 ms overflow
-  mov r1, #999                	// ARR = 999
+  mov r1, #16000                	// ARR = 999
   str r1, [r0, TIM9_ARR]             // Store ARR
 
-  mov r1, #500
-  str r1, [r0, TIM9_CCR1]
+  mov r1, #8000
+  str r1, [r0, TIM9_CCR2]
 
 
-  mov r1, #0x0068
+  mov r1, #(0x0068 << 8)
   str r1, [r0, TIM9_CCMR1]
 
 
   ldr r2, [r0, TIM9_CCER]
-  orr r2, r2, #0x0001
+  orr r2, r2, #0x0010
   str r2, [r0, TIM9_CCER] //TIM9_CCER ARP prenable
+
+  ldr r2, [r0]  //TIM9_CR1 ARR preload
+  orr r2, r2, #0x0080
+  str r2, [r0]
 
   ldr r2, [r0, TIM9_EGR]  //TIM9_CR1 write to shadow regs
   orr r2, r2, #0x0001
   str r2, [r0, TIM9_EGR]
 
 
+
   ldr r2, [r0]  //TIM9_CR1 enable timer
   orr r2, r2, #0x0001
   str r2, [r0]
 
+
+
   bx lr
 
   	.size PWMTIM9, .-PWMTIM9
+
+
+
+  	.section .text.PWMTIM4
+  	.weak PWMTIM4
+  	.type PWMTIM4, %function
+PWMTIM4:
+
+
+
+  ldr r0, =RCC_APB1ENR 	    //enable the tim9 clock
+  ldr r1, [r0]
+  orr r1, r1, #0x0004
+  str r1, [r0]
+
+  ldr r0, =RCC_AHB1ENR       //gpiob enable clock peripheral
+  ldr r1, [r0]
+  orr r1, r1, #0x0002
+  str r1, [r0]
+
+
+  ldr r0, =GPIOB_BASE
+
+
+  ldr r1, [r0]
+  bic r1, r1, #(0b11 << (2 * 6))   // Clear PB6
+  orr r1, r1, #(0b10 << (2 * 6))   // Set PB6 to alternate function
+  str r1, [r0]
+
+
+  ldr r1, [r0, #0xC]
+  bic r1, r1, #(0x3 << (2*6)) // clear pull up down resiter
+  orr r1, r1, #(0b01 << (2 * 6))   // Set PB6 tro pull up
+  str r1, [r0, #0xC]
+
+
+  ldr r1, [r0, #0x20]       //; GPIOx_AFRH
+  bic r1, r1, #(0xF << (6 * 4))
+  orr r1, r1, #(0x2 << (6 * 4))
+  str r1, [r0, #0x20]
+
+
+  ldr r0, =TIM4_BASE
+
+  mov r1, #10000                  //; Prescaler = 83
+  str r1, [r0, TIM4_PSC]            // ; Store PSC
+
+  									// Set Auto-Reload (ARR) → 1 ms overflow
+  mov r1, #16000                	// ARR = 999
+  str r1, [r0, TIM4_ARR]             // Store ARR
+
+  ldr r2, [r0]  //TIM4_CR1 ARR preload
+  orr r2, r2, #0x0080
+  str r2, [r0]
+
+  ldr r2, [r0, TIM4_EGR]  //TIM4_CR1 write to shadow regs
+  orr r2, r2, #0x0001
+  str r2, [r0, TIM4_EGR]
+
+
+
+  mov r1, #8000
+  str r1, [r0, TIM4_CCR1] //50 duty cycle
+
+  mov r1, #(0x0068)
+  str r1, [r0, TIM4_CCMR1] // pwm mode 6
+
+
+  ldr r2, [r0, TIM4_CCER]
+  orr r2, r2, #0x0001
+  str r2, [r0, TIM4_CCER] //TIM4_CCER ARP prenable
+
+  ldr r2, [r0]  //TIM9_CR1 enable timer
+  orr r2, r2, #0x0001
+  str r2, [r0]
+
+
+
+  bx lr
+
+  	.size PWMTIM4, .-PWMTIM4
+
+
+ 	.section .text.PA11TEST
+  	.weak PA11TEST
+  	.type PA11TEST, %function
+PA11TEST:
+  ldr r0, =GPIOA_BASE
+  ldr r1, [r0]
+  bic r1, r1, #(0b11 << (2 * 11))   // Clear PA11
+  orr r1, r1, #(0b01 << (2 * 11))   // Set PA3 togpio
+  str r1, [r0]
+
+   ldr r1, [r0, 0x08]
+  bic r1, r1, #(0b11 << (2 * 11))   // Clear PA3
+  orr r1, r1, #(0b10 << (2 * 11))   // Set to high speed
+  str r1, [r0, #0x08]
+
+  ldr r1, [r0, 0x0C]
+  bic r1, r1, #(0b11 << (2 * 11))   // Clear PA11
+  orr r1, r1, #(0b01 << (2 * 11))   // Set to pull up
+  str r1, [r0, #0x0C]
+
+
+  ldr r1, =#(1 << 11)
+  str r1, [r0, #0x18]
+
+  bx lr
+
+ // ldr r1, [r0, #0x24]       //; GPIOx_AFRH
+//  bic r1, r1, #(0xF << (3 * 4))
+ // orr r1, r1, #(0x2 << (3 * 4))
+ // str r1, [r0, #0x24]
+
+ 	.size PA11TEST, .-PA11TEST
 
 /**
  * @brief  This is the code that gets called when the processor first
@@ -210,56 +371,12 @@ LoopFillZerobss:
 /* Call static constructors */
   bl __libc_init_array
 /* Call the application's entry point.*/
-  BL HAL_Init
+ // BL HAL_Init
 
   BL SystemClock_Config
 
-
-  ldr r0, =RCC_AHB1ENR //gpio enable clock peripheral
-  ldr r1, [r0]
-  orr r1, r1, #0x0001
-  str r1, [r0]
-
-  ldr r0, =#0x40020000
-  ldr r1, [r0]
-  bic r1, r1, #(0b11 << (2 * 2))   // Clear mode bits for PA2
-  orr r1, r1, #(0b10 << (2 * 2))  // Set to Alternate Function
-  str r1, [r0]
-
-  ldr r1, [r0, #0x20]       //; GPIOx_AFRL
-  bic r1, r1, #(0xF << (4 * 2))     //; Clear AF bits for PA2
-  orr r1, r1, #(0x3 << (4 * 2))     //; AF3 for TIM9_CH1
-  str r1, [r0, #0x20]
-
-  // (Optional) Enable pull-up for PA2
-ldr r1, [r0, #0x0C]      // GPIOA_PUPDR
-bic r1, r1, #(0b11 << 4) // Clear PA2 bits
-orr r1, r1, #(0b01 << 4) // Pull-up
-str r1, [r0, #0x0C]
-
-
-
-  MOV r0, #0x01e0
-  MOV r1, #0x0001
-  MOV r2, #0x0001
-  MOV r3, #0x0002
-  MOV r4, #0x0000
-  PUSH {r0, r1, r2, r3, r4}
-  MOV r1, sp
-  MOV r0, #0x0000
-  MOVT r0, #0x4002
-  BL HAL_GPIO_Init
-  POP {r0, r1, r2, r3, r4}
-  bl PWMTIM9
-  MOV r0, #0x0000
-  MOVT r0, #0x4002
-  mov r1, #0x0040
-  LABEL:
-  PUSH { r0, r1 }
-  bl  HAL_GPIO_TogglePin
-  mov r0, #1000
-  bl HAL_Delay
-  POP { r0, r1 }
+  bl PWMTIM4
+LABEL:
   b LABEL
 .size  AllBeginning, .-AllBeginning
 
