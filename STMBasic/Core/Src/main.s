@@ -81,6 +81,39 @@ defined in linker script */
 .equ TIM4_DMAR, 0x4C
 
 
+//ADC Registers
+// multiply by x-1 to get ADCx registers
+.equ ADC_BASE, 0x40012000
+.equ ADC_SR, 0x0
+.equ ADC_CR1, 0x4
+.equ ADC_CR2, 0x8
+.equ ADC_SMPR1, 0xc
+.equ ADC_SMPR2, 0x10
+.equ ADC_JORF1, 0x14
+.equ ADC_JORF2, 0x18
+.equ ADC_JORF3, 0x1c
+.equ ADC_JORF4, 0x20
+.equ ADC_HTR, 0x24
+.equ ADC_LTR, 0x28
+.equ ADC_SQR1, 0x2c
+.equ ADC_SQR2, 0x30
+.equ ADC_SQR3, 0x34
+.equ ADC_JSQR, 0x38
+.equ ADC_JDR1, 0x3c
+.equ ADC_JDR2, 0x40
+.equ ADC_JDR3, 0x44
+.equ ADC_JDR4, 0x48
+.equ ADC_DR, 0x4C
+.equ ADC_OFFSET, 0x100
+
+
+// common registers
+.equ ADC_CSR, 0x300
+.equ ADC_CCR, 0x304
+.equ ADC_CDR, 0x308
+
+
+
 
 
 /*	.section .text.BasicFunction
@@ -284,9 +317,72 @@ PWMTIM4:
 
   bx lr
 
-  	.size PWMTIM4, .-PWMTIM4
 
 
+
+
+
+
+//pa7 adc in7
+  	.section .text.ADCSETUP
+  	.weak ADCSETUP
+  	.type ADCSETUP, %function
+ADCSETUP:
+
+
+
+  ldr r0, =RCC_AHB1ENR       //gpioa enable clock peripheral
+  ldr r1, [r0]
+  orr r1, r1, #0x0001
+  str r1, [r0]
+
+
+   ldr r0, =RCC_APB2ENR
+  ldr r1, [r0]
+  orr r1, r1, #0x0100 // enable ADC1 clock
+  str r1, [r0]
+
+  ldr r0, =GPIOA_BASE
+  ldr r1, [r0]
+  orr r1, r1, #(0b11 << (2 * 0))   // Set PA0 to analog function
+  str r1, [r0]
+
+
+  ldr r0, =ADC_BASE
+  ldr r1, [r0, ADC_CCR]
+  bic r1, r1, #(0b11 << 16) // set prescalar for adc all config
+  orr r1, r1, #(0b10 << 16)
+  str r1, [r0, ADC_CCR]
+  ldr r1, [r0, ADC_SMPR2]
+  bic r1, r1, #(0b111 << (3 * 0))   // Clear adc_in7
+  orr r1, r1, #(0b100 << (3 * 0))   // set sampling period
+  str r1, [r0, ADC_SMPR2]
+  ldr r1, [r0, ADC_SQR3]
+  orr r1, r1, #0x1
+  str r1, [r0, ADC_SQR3]
+  ldr r1, [r0, ADC_CR2]
+  orr r1, r1, #3
+  
+  str r1, [r0, ADC_CR2] // cont and adc on
+  orr r1, r1, #(0b1 << 30) // start regular conversion
+  str r1, [r0, ADC_CR2]
+
+  mov r1, #0b00010
+
+ loop:
+
+  ldr r2, [r0, ADC_SR]
+  and r2, r2, #0b00010
+  //cbz r2, loop //too far awaya
+  cmp r2, r1
+  bne loop
+  mov r2, #0
+  str r2, [r0, ADC_SR]
+  ldr r2, [r0, ADC_DR]
+  b loop
+  bx lr
+
+  .size ADCSETUP, .-ADCSETUP
  	.section .text.PA11TEST
   	.weak PA11TEST
   	.type PA11TEST, %function
@@ -371,11 +467,10 @@ LoopFillZerobss:
 /* Call static constructors */
   bl __libc_init_array
 /* Call the application's entry point.*/
- // BL HAL_Init
 
   BL SystemClock_Config
 
-  bl PWMTIM4
+  bl ADCSETUP
 LABEL:
   b LABEL
 .size  AllBeginning, .-AllBeginning
