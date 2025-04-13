@@ -16,7 +16,7 @@
 
   .syntax unified
   .cpu cortex-m4
-  .fpu softvfp
+  .fpu fpv4-sp-d16
   .thumb
 
 .global  g_pfnVectors
@@ -247,7 +247,7 @@ PWMTIM4:
 
 
 
-  ldr r0, =RCC_APB1ENR 	    //enable the tim9 clock
+  ldr r0, =RCC_APB1ENR 	    //enable the tim4 clock
   ldr r1, [r0]
   orr r1, r1, #0x0004
   str r1, [r0]
@@ -336,17 +336,15 @@ ADCSETUP:
   orr r1, r1, #0x0001
   str r1, [r0]
 
-
-   ldr r0, =RCC_APB2ENR
+  ldr r0, =RCC_APB2ENR
   ldr r1, [r0]
   orr r1, r1, #0x0100 // enable ADC1 clock
   str r1, [r0]
 
   ldr r0, =GPIOA_BASE
   ldr r1, [r0]
-  orr r1, r1, #(0b11 << (2 * 0))   // Set PA0 to analog function
+  orr r1, r1, #(0b11 << (2 * 7))   // Set PA0 to analog function
   str r1, [r0]
-
 
   ldr r0, =ADC_BASE
   ldr r1, [r0, ADC_CCR]
@@ -354,35 +352,120 @@ ADCSETUP:
   orr r1, r1, #(0b10 << 16)
   str r1, [r0, ADC_CCR]
   ldr r1, [r0, ADC_SMPR2]
-  bic r1, r1, #(0b111 << (3 * 0))   // Clear adc_in7
-  orr r1, r1, #(0b100 << (3 * 0))   // set sampling period
+  //bic r1, r1, #(0b111 << (3 * 7))   // Clear adc_in7
+  orr r1, r1, #(0b111 << (3 * 7))   // set sampling period
   str r1, [r0, ADC_SMPR2]
+  ldr r1, [r0, ADC_SQR1]
+  bic r1, r1, #(0xf << 20); // set total reg count to 1 (0)
+  str r1, [r0, ADC_SQR1]
   ldr r1, [r0, ADC_SQR3]
-  orr r1, r1, #0x1
+  orr r1, r1, #0x7  //set the position in conversion sequence for first poll
   str r1, [r0, ADC_SQR3]
   ldr r1, [r0, ADC_CR2]
   orr r1, r1, #3
-  
   str r1, [r0, ADC_CR2] // cont and adc on
   orr r1, r1, #(0b1 << 30) // start regular conversion
   str r1, [r0, ADC_CR2]
-
   mov r1, #0b00010
+  vmov.f32 s1, #0.5
 
  loop:
 
   ldr r2, [r0, ADC_SR]
   and r2, r2, #0b00010
-  //cbz r2, loop //too far awaya
+  //cbz r2, loop //too far away
   cmp r2, r1
   bne loop
   mov r2, #0
   str r2, [r0, ADC_SR]
   ldr r2, [r0, ADC_DR]
+  vmov s0, r2
+  vcvt.f32.u32 s0, s0
+  vmul.f32 s2, s0, s1
   b loop
   bx lr
 
   .size ADCSETUP, .-ADCSETUP
+
+
+
+	.section .text.ADC1EnableFlicker
+	.weak ADC1EnableFlicker
+	.type ADC1EnableFlicker, %function
+ADC1EnableFlicker:
+
+  PUSH { lr }
+
+  bl PWMTIM4
+
+  POP { lr }
+
+  ldr r0, =RCC_AHB1ENR       //gpioa enable clock peripheral
+  ldr r1, [r0]
+  orr r1, r1, #0x0001
+  str r1, [r0]
+  ldr r0, =RCC_APB2ENR
+  ldr r1, [r0]
+  orr r1, r1, #0x0100 // enable ADC1 clock
+  str r1, [r0]
+  ldr r0, =GPIOA_BASE
+  ldr r1, [r0]
+  orr r1, r1, #(0b11 << (2 * 7))   // Set PA0 to analog function
+  str r1, [r0]
+  ldr r0, =ADC_BASE
+  ldr r1, [r0, ADC_CCR]
+  bic r1, r1, #(0b11 << 16) // set prescalar for adc all config
+  orr r1, r1, #(0b10 << 16)
+  str r1, [r0, ADC_CCR]
+  ldr r1, [r0, ADC_SMPR2]
+  orr r1, r1, #(0b111 << (3 * 7))   // set sampling period
+  str r1, [r0, ADC_SMPR2]
+  ldr r1, [r0, ADC_SQR1]
+  bic r1, r1, #(0xf << 20); // set total reg count to 1 (0)
+  str r1, [r0, ADC_SQR1]
+  ldr r1, [r0, ADC_SQR3]
+  orr r1, r1, #0x7  //set the position in conversion sequence for first poll
+  str r1, [r0, ADC_SQR3]
+  ldr r1, [r0, ADC_CR2]
+  orr r1, r1, #3
+  str r1, [r0, ADC_CR2] // cont and adc on
+  orr r1, r1, #(0b1 << 30) // start regular conversion
+  str r1, [r0, ADC_CR2]
+
+   ldr r3, =#4000
+  mov r5, #12000
+  vmov s4, r5
+  vcvt.f32.u32 s4, s4
+  mov r4, #0xfff
+  vmov s3, r4
+  vcvt.f32.u32 s3, s3
+  mov r1, #(0b00010)
+LABEL2:
+  ldr r0, =ADC_BASE
+  ldr r2, [r0, ADC_SR]
+  and r2, r2, #0b00010
+  cmp r2, r1
+  bne LABEL2  // check if adc has finsihed conversion eoc
+  mov r2, #0
+  str r2, [r0, ADC_SR] // clear eoc
+  ldr r2, [r0, ADC_DR]
+  vmov s0, r2
+  vcvt.f32.u32 s0, s0
+  vdiv.f32 s1, s0, s3 // ADC_DR / 2^12-1
+  vmul.f32 s2, s1, s4 // adc% * 16000-12000
+  vcvt.u32.f32 s2, s2
+  vmov r2, s2
+  add r2, r2, r3
+  ldr r0, =TIM4_BASE
+  str r2, [r0, TIM4_ARR]             // Store ARR
+  lsr r2, r2, #1
+  str r2, [r0, TIM4_CCR1] //50 duty cycle
+  b LABEL2
+
+  bx lr
+
+	.size ADC1EnableFlicker, .-ADC1EnableFlicker
+
  	.section .text.PA11TEST
   	.weak PA11TEST
   	.type PA11TEST, %function
@@ -464,13 +547,12 @@ LoopFillZerobss:
 
 /* Call the clock system initialization function.*/
   bl  SystemInit
-/* Call static constructors */
-  bl __libc_init_array
 /* Call the application's entry point.*/
 
   BL SystemClock_Config
 
-  bl ADCSETUP
+  bl ADC1EnableFlicker
+
 LABEL:
   b LABEL
 .size  AllBeginning, .-AllBeginning
