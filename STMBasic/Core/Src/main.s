@@ -304,10 +304,17 @@ PWMTIM4:
   mov r1, #(0x0068)
   str r1, [r0, TIM4_CCMR1] // pwm mode 6
 
+  ldr r1, [r0, TIM4_DIER]
+  orr r1, r1, #0x0001
+  str r1, [r0, TIM4_DIER]
 
   ldr r2, [r0, TIM4_CCER]
   orr r2, r2, #0x0001
   str r2, [r0, TIM4_CCER] //TIM4_CCER ARP prenable
+
+  ldr r1, =NVIC_ISER0 // interrupt set enable for NVIC
+  mov r2, #1 << 30
+  str r2, [r1]
 
   ldr r2, [r0]  //TIM9_CR1 enable timer
   orr r2, r2, #0x0001
@@ -432,20 +439,38 @@ ADC1EnableFlicker:
   orr r1, r1, #(0b1 << 30) // start regular conversion
   str r1, [r0, ADC_CR2]
 
-   ldr r3, =#4000
+
+
+  bx lr
+
+	.size ADC1EnableFlicker, .-ADC1EnableFlicker
+
+	.section .text.TIM4_IRQHandler
+  	.weak TIM4_IRQHandler
+  	.type TIM4_IRQHandler, %function
+TIM4_IRQHandler:
+  PUSH { r0-r5 }
+  VPUSH { s0-s3 }
+  LDR r0, =NVIC_ICPR0
+  MOV r1, #(1 << 30)
+  STR r1, [r0]
+  ldr r0, =ADC_BASE
+  ldr r2, [r0, ADC_SR]
+  mov r1, #(0b00010)
+  and r2, r2, r1
+  cmp r2, r1
+  bne LABEL2  // check if adc has finsihed conversion eoc
+
+
+  ldr r3, =#4000
   mov r5, #12000
   vmov s4, r5
   vcvt.f32.u32 s4, s4
   mov r4, #0xfff
   vmov s3, r4
   vcvt.f32.u32 s3, s3
-  mov r1, #(0b00010)
-LABEL2:
-  ldr r0, =ADC_BASE
-  ldr r2, [r0, ADC_SR]
-  and r2, r2, #0b00010
-  cmp r2, r1
-  bne LABEL2  // check if adc has finsihed conversion eoc
+
+
   mov r2, #0
   str r2, [r0, ADC_SR] // clear eoc
   ldr r2, [r0, ADC_DR]
@@ -460,11 +485,12 @@ LABEL2:
   str r2, [r0, TIM4_ARR]             // Store ARR
   lsr r2, r2, #1
   str r2, [r0, TIM4_CCR1] //50 duty cycle
-  b LABEL2
-
+ LABEL2:
+  POP {r0-r5 }
+  VPOP { s0-s3 }
   bx lr
 
-	.size ADC1EnableFlicker, .-ADC1EnableFlicker
+  	.size TIM4_IRQHandler, .-TIM4_IRQHandler
 
  	.section .text.PA11TEST
   	.weak PA11TEST
@@ -831,8 +857,8 @@ g_pfnVectors:
    .weak      TIM3_IRQHandler
    .thumb_set TIM3_IRQHandler,Default_Handler
 
-   .weak      TIM4_IRQHandler
-   .thumb_set TIM4_IRQHandler,Default_Handler
+ //  .weak      TIM4_IRQHandler
+//   .thumb_set TIM4_IRQHandler,Default_Handler
 
    .weak      I2C1_EV_IRQHandler
    .thumb_set I2C1_EV_IRQHandler,Default_Handler
