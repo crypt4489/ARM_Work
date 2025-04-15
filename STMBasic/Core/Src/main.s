@@ -281,11 +281,11 @@ PWMTIM4:
 
   ldr r0, =TIM4_BASE
 
-  mov r1, #10000                  //; Prescaler = 83
+  mov r1, #10000                 //; Prescaler = 83
   str r1, [r0, TIM4_PSC]            // ; Store PSC
 
   									// Set Auto-Reload (ARR) → 1 ms overflow
-  mov r1, #16000                	// ARR = 999
+  mov r1, #16000               	// ARR = 999
   str r1, [r0, TIM4_ARR]             // Store ARR
 
   ldr r2, [r0]  //TIM4_CR1 ARR preload
@@ -312,13 +312,15 @@ PWMTIM4:
   orr r2, r2, #0x0001
   str r2, [r0, TIM4_CCER] //TIM4_CCER ARP prenable
 
+   ldr r2, [r0]  //TIM9_CR1 enable timer
+  orr r2, r2, #0x0001
+  str r2, [r0]
+
   ldr r1, =NVIC_ISER0 // interrupt set enable for NVIC
   mov r2, #1 << 30
   str r2, [r1]
 
-  ldr r2, [r0]  //TIM9_CR1 enable timer
-  orr r2, r2, #0x0001
-  str r2, [r0]
+
 
 
 
@@ -451,6 +453,10 @@ ADC1EnableFlicker:
 TIM4_IRQHandler:
   PUSH { r0-r5 }
   VPUSH { s0-s3 }
+  LDR r0, =TIM4_BASE
+  LDR r1, [r0, TIM4_SR]
+  BIC r1, r1, #0x0001
+  STR r1, [r0, TIM4_SR]
   LDR r0, =NVIC_ICPR0
   MOV r1, #(1 << 30)
   STR r1, [r0]
@@ -486,8 +492,9 @@ TIM4_IRQHandler:
   lsr r2, r2, #1
   str r2, [r0, TIM4_CCR1] //50 duty cycle
  LABEL2:
-  POP {r0-r5 }
+
   VPOP { s0-s3 }
+  POP {r0-r5 }
   bx lr
 
   	.size TIM4_IRQHandler, .-TIM4_IRQHandler
