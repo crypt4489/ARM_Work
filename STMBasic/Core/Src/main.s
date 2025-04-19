@@ -584,7 +584,7 @@ LoopFillZerobss:
 
   BL SystemClock_Config
 
-  bl ADC1EnableFlicker
+ bl DMATest
 
 LABEL:
   b LABEL
