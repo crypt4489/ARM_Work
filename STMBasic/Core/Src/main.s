@@ -19,6 +19,8 @@
   .fpu fpv4-sp-d16
   .thumb
 
+.include "addresses.s"
+
 .global  g_pfnVectors
 .global  Default_Handler
 
@@ -35,97 +37,6 @@ defined in linker script */
 .word  _ebss
 /* stack used for SystemInit_ExtMemCtl; always internal RAM used */
 
-
-.equ RCC_AHB1ENR, 0x40023830
-.equ TIM9_BASE, 0x40014000
-.equ TIM9_CR1, 0x00
-.equ TIM9_SMCR, 0x08
-.equ TIM9_DIER, 0x0c
-.equ TIM9_SR, 0x10
-.equ TIM9_EGR, 0x14
-.equ TIM9_CCMR1, 0x18
-.equ TIM9_CCER, 0x20
-.equ TIM9_CNT, 0x24
-.equ TIM9_PSC, 0x28
-.equ TIM9_ARR, 0x2c
-.equ TIM9_CCR1, 0x34
-.equ TIM9_CCR2, 0x38
-.equ NVIC_ISER0, 0xE000E100 // interrupt enable nvic
-.equ RCC_APB2RSTR, 0x40023824
-.equ RCC_APB1ENR, 0x40023840
-.equ RCC_APB2ENR, 0x40023844
-.equ EXTI, 0x40013c00
-.equ NVIC_ICPR0, 0xE000E280 //clear pending nvic
-.equ GPIOA_BASE, 0x40020000
-.equ GPIOB_BASE, 0x40020400
-
-//tim4 registers
-.equ TIM4_BASE, 0x40000800
-.equ TIM4_CR1, 0x00
-.equ TIM4_CR2, 0x04
-.equ TIM4_SMCR, 0x08
-.equ TIM4_DIER, 0x0C
-.equ TIM4_SR, 0x10
-.equ TIM4_EGR, 0x14
-.equ TIM4_CCMR1, 0x18
-.equ TIM4_CCMR2, 0x1C
-.equ TIM4_CCER, 0x20
-.equ TIM4_CNT, 0x24
-.equ TIM4_PSC, 0x28
-.equ TIM4_ARR, 0x2C
-.equ TIM4_CCR1, 0x34
-.equ TIM4_CCR2, 0x38
-.equ TIM4_CCR3, 0x3C
-.equ TIM4_CCR4, 0x40
-.equ TIM4_DCR,  0x48
-.equ TIM4_DMAR, 0x4C
-
-
-//ADC Registers
-// multiply by x-1 to get ADCx registers
-.equ ADC_BASE, 0x40012000
-.equ ADC_SR, 0x0
-.equ ADC_CR1, 0x4
-.equ ADC_CR2, 0x8
-.equ ADC_SMPR1, 0xc
-.equ ADC_SMPR2, 0x10
-.equ ADC_JORF1, 0x14
-.equ ADC_JORF2, 0x18
-.equ ADC_JORF3, 0x1c
-.equ ADC_JORF4, 0x20
-.equ ADC_HTR, 0x24
-.equ ADC_LTR, 0x28
-.equ ADC_SQR1, 0x2c
-.equ ADC_SQR2, 0x30
-.equ ADC_SQR3, 0x34
-.equ ADC_JSQR, 0x38
-.equ ADC_JDR1, 0x3c
-.equ ADC_JDR2, 0x40
-.equ ADC_JDR3, 0x44
-.equ ADC_JDR4, 0x48
-.equ ADC_DR, 0x4C
-.equ ADC_OFFSET, 0x100
-
-
-// common registers
-.equ ADC_CSR, 0x300
-.equ ADC_CCR, 0x304
-.equ ADC_CDR, 0x308
-
-
-
-
-
-/*	.section .text.BasicFunction
-	.weak BasicFunction
-	.type BasicFunction, %function
- BasicFunction:
-  EOR r1, r1         // r1 = 0
-  ORN r0, r1, r0     // r0 = ~acc
-  AND r0, r0, #0x000f // r0 = r0 & 0x000f
-  LSL r0, r0, #5     // r0 = r0 << 5
-  BX lr              // Return from the function
-  .size  BasicFunction, .-BasicFunction */
 
     .section  .text.TIM9_Handler
 TIM9_Handler:
@@ -584,7 +495,7 @@ LoopFillZerobss:
 
   BL SystemClock_Config
 
- bl DMATest
+ bl DMAUSART
 
 LABEL:
   b LABEL

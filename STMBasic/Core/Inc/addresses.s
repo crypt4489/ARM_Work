@@ -1,0 +1,145 @@
+.equ RCC_AHB1ENR, 0x40023830
+.equ TIM9_BASE, 0x40014000
+.equ TIM9_CR1, 0x00
+.equ TIM9_SMCR, 0x08
+.equ TIM9_DIER, 0x0c
+.equ TIM9_SR, 0x10
+.equ TIM9_EGR, 0x14
+.equ TIM9_CCMR1, 0x18
+.equ TIM9_CCER, 0x20
+.equ TIM9_CNT, 0x24
+.equ TIM9_PSC, 0x28
+.equ TIM9_ARR, 0x2c
+.equ TIM9_CCR1, 0x34
+.equ TIM9_CCR2, 0x38
+.equ NVIC_ISER0, 0xE000E100 // interrupt enable nvic
+.equ RCC_APB2RSTR, 0x40023824
+.equ RCC_APB1ENR, 0x40023840
+.equ RCC_APB2ENR, 0x40023844
+.equ EXTI, 0x40013c00
+.equ NVIC_ICPR0, 0xE000E280 //clear pending nvic
+.equ GPIOA_BASE, 0x40020000
+.equ GPIOB_BASE, 0x40020400
+
+//tim4 registers
+.equ TIM4_BASE, 0x40000800
+.equ TIM4_CR1, 0x00
+.equ TIM4_CR2, 0x04
+.equ TIM4_SMCR, 0x08
+.equ TIM4_DIER, 0x0C
+.equ TIM4_SR, 0x10
+.equ TIM4_EGR, 0x14
+.equ TIM4_CCMR1, 0x18
+.equ TIM4_CCMR2, 0x1C
+.equ TIM4_CCER, 0x20
+.equ TIM4_CNT, 0x24
+.equ TIM4_PSC, 0x28
+.equ TIM4_ARR, 0x2C
+.equ TIM4_CCR1, 0x34
+.equ TIM4_CCR2, 0x38
+.equ TIM4_CCR3, 0x3C
+.equ TIM4_CCR4, 0x40
+.equ TIM4_DCR,  0x48
+.equ TIM4_DMAR, 0x4C
+
+
+//ADC Registers
+// multiply by x-1 to get ADCx registers
+.equ ADC_BASE, 0x40012000
+.equ ADC_SR, 0x0
+.equ ADC_CR1, 0x4
+.equ ADC_CR2, 0x8
+.equ ADC_SMPR1, 0xc
+.equ ADC_SMPR2, 0x10
+.equ ADC_JORF1, 0x14
+.equ ADC_JORF2, 0x18
+.equ ADC_JORF3, 0x1c
+.equ ADC_JORF4, 0x20
+.equ ADC_HTR, 0x24
+.equ ADC_LTR, 0x28
+.equ ADC_SQR1, 0x2c
+.equ ADC_SQR2, 0x30
+.equ ADC_SQR3, 0x34
+.equ ADC_JSQR, 0x38
+.equ ADC_JDR1, 0x3c
+.equ ADC_JDR2, 0x40
+.equ ADC_JDR3, 0x44
+.equ ADC_JDR4, 0x48
+.equ ADC_DR, 0x4C
+.equ ADC_OFFSET, 0x100
+
+
+// common registers
+.equ ADC_CSR, 0x300
+.equ ADC_CCR, 0x304
+.equ ADC_CDR, 0x308
+
+
+ .equ DMA1_BASE, 0x40026000
+ .equ DMA2_BASE, 0x40026400
+ .equ DMA_LISR, 0x00
+ .equ DMA_HISR, 0x04
+ .equ DMA_LIFCR, 0x08
+ .equ DMA_HIFCR, 0x0C
+ .equ DMA_S0CR, 0x10
+.equ DMA_S0NDTR, 0x14
+.equ DMA_S0PAR, 0x18
+.equ DMA_S0M0AR, 0x1c
+.equ DMA_S0M1AR, 0x20
+.equ DMA_S0FCR, 0x24
+.equ DMA_S1CR, 0x28
+.equ DMA_S1NDTR, 0x2c
+.equ DMA_S1PAR, 0x30
+.equ DMA_S1M0AR, 0x34
+.equ DMA_S1M1AR, 0x38
+.equ DMA_S1FCR, 0x3c
+.equ DMA_S2CR, 0x40
+.equ DMA_S2NDTR, 0x44
+.equ DMA_S2PAR, 0x48
+.equ DMA_S2M0AR, 0x4c
+.equ DMA_S2M1AR, 0x50
+.equ DMA_S2FCR, 0x54
+.equ DMA_S3CR, 0x58
+.equ DMA_S3NDTR, 0x5c
+.equ DMA_S3PAR, 0x60
+.equ DMA_S3M0AR, 0x64
+.equ DMA_S3M1AR, 0x68
+.equ DMA_S3FCR, 0x6c
+.equ DMA_S4CR, 0x70
+.equ DMA_S4NDTR, 0x74
+.equ DMA_S4PAR, 0x78
+.equ DMA_S4M0AR, 0x7c
+.equ DMA_S4M1AR, 0x80
+.equ DMA_S4FCR, 0x84
+.equ DMA_S5CR, 0x88
+.equ DMA_S5NDTR, 0x8c
+.equ DMA_S5PAR, 0x90
+.equ DMA_S5M0AR, 0x94
+.equ DMA_S5M1AR, 0x98
+.equ DMA_S5FCR, 0x9c
+.equ DMA_S6CR, 0xa0
+.equ DMA_S6NDTR, 0xa4
+.equ DMA_S6PAR, 0xa8
+.equ DMA_S6M0AR, 0xac
+.equ DMA_S6M1AR, 0xb0
+.equ DMA_S6FCR, 0xb4
+.equ DMA_S7CR, 0xb8
+.equ DMA_S7NDTR, 0xbc
+.equ DMA_S7PAR, 0xc0
+.equ DMA_S7M0AR, 0xc4
+.equ DMA_S7M1AR, 0xc8
+.equ DMA_S7FCR, 0xcc
+
+ .equ USART1_BASE, 0x40011000
+ .equ USART2_BASE, 0x40004400
+ .equ USART3_BASE, 0x40004800
+ .equ UART4_BASE, 0x40004C00
+ .equ UART5_BASE, 0x40005000
+ .equ USART6_BASE, 0x40014000
+ .equ USART_SR, 0x00
+ .equ USART_DR, 0x04
+ .equ USART_BRR, 0x08
+ .equ USART_CR1, 0x0c
+ .equ USART_CR2, 0x10
+ .equ USART_CR3, 0x14
+ .equ USART_GTPR, 0x18

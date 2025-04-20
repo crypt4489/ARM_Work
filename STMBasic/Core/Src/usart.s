@@ -7,85 +7,19 @@
 .syntax unified
 .cpu cortex-m4
 .thumb
+
+
+.include "addresses.s"
+
+
 .global EstablishUSART2
 .global USART2_IRQHandler
 .global EstablishUSART2_INT
 .global DMATest
+.global DMAUSART
+.global OutputStringSize
 
 
- .equ USART1_BASE, 0x40011000
- .equ USART2_BASE, 0x40004400
- .equ USART3_BASE, 0x40004800
- .equ UART4_BASE, 0x40004C00
- .equ UART5_BASE, 0x40005000
- .equ USART6_BASE, 0x40014000
- .equ USART_SR, 0x00
- .equ USART_DR, 0x04
- .equ USART_BRR, 0x08
- .equ USART_CR1, 0x0c
- .equ USART_CR2, 0x10
- .equ USART_CR3, 0x14
- .equ USART_GTPR, 0x18
- .equ RCC_APB1ENR, 0x40023840
- .equ RCC_AHB1ENR, 0x40023830
- .equ GPIOA_BASE, 0x40020000
- .equ NVIC_ISER0, 0xE000E100 // interrupt enable nvic
- .equ NVIC_ICPR0, 0xE000E280 //clear pending nvic
-
- .equ DMA1_BASE, 0x40026000
- .equ DMA2_BASE, 0x40026400
- .equ DMA_LISR, 0x00
- .equ DMA_HISR, 0x04
- .equ DMA_LIFCR, 0x08
- .equ DMA_HIFCR, 0x0C
- .equ DMA_S0CR, 0x10
-.equ DMA_S0NDTR, 0x14
-.equ DMA_S0PAR, 0x18
-.equ DMA_S0M0AR, 0x1c
-.equ DMA_S0M1AR, 0x20
-.equ DMA_S0FCR, 0x24
-.equ DMA_S1CR, 0x28
-.equ DMA_S1NDTR, 0x2c
-.equ DMA_S1PAR, 0x30
-.equ DMA_S1M0AR, 0x34
-.equ DMA_S1M1AR, 0x38
-.equ DMA_S1FCR, 0x3c
-.equ DMA_S2CR, 0x40
-.equ DMA_S2NDTR, 0x44
-.equ DMA_S2PAR, 0x48
-.equ DMA_S2M0AR, 0x4c
-.equ DMA_S2M1AR, 0x50
-.equ DMA_S2FCR, 0x54
-.equ DMA_S3CR, 0x58
-.equ DMA_S3NDTR, 0x5c
-.equ DMA_S3PAR, 0x60
-.equ DMA_S3M0AR, 0x64
-.equ DMA_S3M1AR, 0x68
-.equ DMA_S3FCR, 0x6c
-.equ DMA_S4CR, 0x70
-.equ DMA_S4NDTR, 0x74
-.equ DMA_S4PAR, 0x78
-.equ DMA_S4M0AR, 0x7c
-.equ DMA_S4M1AR, 0x80
-.equ DMA_S4FCR, 0x84
-.equ DMA_S5CR, 0x88
-.equ DMA_S5NDTR, 0x8c
-.equ DMA_S5PAR, 0x90
-.equ DMA_S5M0AR, 0x94
-.equ DMA_S5M1AR, 0x98
-.equ DMA_S5FCR, 0x9c
-.equ DMA_S6CR, 0xa0
-.equ DMA_S6NDTR, 0xa4
-.equ DMA_S6PAR, 0xa8
-.equ DMA_S6M0AR, 0xac
-.equ DMA_S6M1AR, 0xb0
-.equ DMA_S6FCR, 0xb4
-.equ DMA_S7CR, 0xb8
-.equ DMA_S7NDTR, 0xbc
-.equ DMA_S7PAR, 0xc0
-.equ DMA_S7M0AR, 0xc4
-.equ DMA_S7M1AR, 0xc8
-.equ DMA_S7FCR, 0xcc
 
  .section .data
 OutputString:
@@ -219,7 +153,7 @@ loop:
 
 
  ldr r1, [r0, USART_CR1]
- orr r1, r1, #0x0088 // 8 bit word and Start USART
+ orr r1, r1, #0x0088 // 8 bit word and Start USART and set INT for TIX
  str r1, [r0, USART_CR1]
 
   ldr r1, =NVIC_ISER0 // interrupt set enable for NVIC
@@ -285,3 +219,106 @@ DMATest:
  bx lr
 
  .size  DMATest, .-DMATest
+
+
+ .section  .text.DMAUSART
+ .type DMAUSART, %function
+DMAUSART:
+ ldr r0, =RCC_AHB1ENR
+ ldr r1, [r0]
+ orr r1, r1, #(0b1 << 21) // enabled DMA1 controller (only one for memory to memory)
+ orr r1, r1, #0x0001 //enable GPIOA clock
+ str r1, [r0]
+
+ ldr r0, =GPIOA_BASE
+
+
+ ldr r1, [r0]
+ bic r1, r1, #(0b11 << (2 * 2))   // Clear PA2
+ orr r1, r1, #(0b10 << (2 * 2))   // Set PA2 transmitter
+ str r1, [r0]
+
+
+ ldr r1, [r0, #0xC]
+ bic r1, r1, #(0x3 << (2 * 2)) // clear pull up down resiter
+ orr r1, r1, #(0b01 << (2 * 2))   // Set PA2 to pull up
+ str r1, [r0, #0xC]
+
+
+ ldr r1, [r0, #0x20]       //; GPIOA_AFRH
+ bic r1, r1, #(0xF << (2 * 4))
+ orr r1, r1, #(0x7 << (2 * 4)) //USART2
+ str r1, [r0, #0x20]
+
+ ldr r0, =RCC_APB1ENR
+ ldr r1, =#0x20000
+ str r1, [r0]
+
+
+ ldr r0, =USART2_BASE
+
+
+
+ ldr r1, [r0, USART_CR1]
+ orr r1, r1, #0x2000 // 8 bit word and Start USART
+ str r1, [r0, USART_CR1]
+
+ mov r1, #0x124f
+ str r1, [r0, USART_BRR] // set baud rate of 9600
+
+ ldr r1, [r0, USART_CR3]
+ orr r1, r1, #0x0080 // Enable DMA Transfer
+ str r1, [r0, USART_CR3]
+
+
+ ldr r1, =[DMA1_BASE]  // load dma1 base
+ ldr r2, =OutputString // address to be written
+ add r3, r0, USART_DR
+ str r3, [r1, DMA_S6PAR] // dma write is USART address
+ str r2, [r1, DMA_S6M0AR] //dma read is outputString
+ ldr r2, =OutputStringSize
+ ldr r2, [r2]
+
+ str r2, [r1, DMA_S6NDTR] // number of n-bytes to write
+ mov r2, #0x0440 // auto increment read address and keep fixed write address, mem-to-per
+ movt r2, #0x0800
+ str r2, [r1, DMA_S6CR] //configure dma transfer
+ ldr r2, [r1, DMA_S6FCR]
+ orr r2, r2, #(0b11)
+ str r2, [r1, DMA_S6FCR]
+
+
+
+ mov r4, r1
+ eor r1, r1
+ str r1, [r0, USART_SR]
+
+ ldr r1, [r0, USART_CR1]
+ orr r1, r1, #0x0008 // 8 bit word and Start USART
+ str r1, [r0, USART_CR1]
+ ldr r1, [r4, DMA_S6CR]
+ orr r1, r1, #1
+ str r1, [r4, DMA_S6CR] //start dma transfer
+
+ ldr r0, =[DMA1_BASE] // this will just write the string to the buffer over and over again
+ ldr r1, =OutputStringSize
+ ldr r1, [r1]
+ mov r3, #0
+ movt r3, #(1 << 5)
+dmausartloop:
+ ldr r2, [r0, DMA_HISR]
+ and r4, r2, r3
+ cmp r4, r3
+ bne dmausartloop
+ eor r4, r4
+ movt r4, #(0b110001) //fifo error is for when the buffer is cleared, but no more data is there
+ str r4, [r0, DMA_HIFCR]
+ str r1, [r0, DMA_S6NDTR]
+ ldr r2, [r0, DMA_S6CR]
+ orr r2, r2, #1
+ str r2, [r0, DMA_S6CR]
+ b dmausartloop
+ bx lr
+
+ .size DMAUSART, .-DMAUSART
+
