@@ -18,6 +18,7 @@
 .global DMATest
 .global DMAUSART
 .global OutputStringSize
+.global DMAUSARTReceive
 
 
 
@@ -321,4 +322,83 @@ dmausartloop:
  bx lr
 
  .size DMAUSART, .-DMAUSART
+
+
+  .section  .text.DMAUSARTReceive
+ .type DMAUSARTReceive, %function
+DMAUSARTReceive:
+ ldr r0, =RCC_AHB1ENR
+ ldr r1, [r0]
+ orr r1, r1, #(0b1 << 21) // enabled DMA1 controller (only one for memory to memory)
+ orr r1, r1, #0x0001 //enable GPIOA clock
+ str r1, [r0]
+
+ ldr r0, =GPIOA_BASE
+
+
+ ldr r1, [r0]
+ bic r1, r1, #(0b11 << (3 * 2))   // Clear PA3
+ orr r1, r1, #(0b10 << (3 * 2))   // Set PA3 Receiver
+ str r1, [r0]
+
+
+ ldr r1, [r0, #0xC]
+ bic r1, r1, #(0x3 << (3 * 2)) // clear pull up down resiter
+ orr r1, r1, #(0b01 << (3 * 2))   // Set PA3 to pull up
+ str r1, [r0, #0xC]
+
+
+ ldr r1, [r0, #0x20]       //; GPIOA_AFRH
+ bic r1, r1, #(0xF << (3 * 4))
+ orr r1, r1, #(0x7 << (3 * 4)) //USART2
+ str r1, [r0, #0x20]
+
+ ldr r0, =RCC_APB1ENR
+ ldr r1, =#0x20000 //enable usart2 clock
+ str r1, [r0]
+
+
+ ldr r0, =USART2_BASE
+
+
+
+ ldr r1, [r0, USART_CR1]
+ orr r1, r1, #0x2000 // 8 bit word and Start USART
+ str r1, [r0, USART_CR1]
+
+ mov r1, #0x124f
+ str r1, [r0, USART_BRR] // set baud rate of 9600
+
+ ldr r1, [r0, USART_CR3]
+ orr r1, r1, #0x0040 // Enable USART Receive DMAR
+ str r1, [r0, USART_CR3]
+
+
+ ldr r1, =[DMA1_BASE]  // load dma1 base
+ ldr r2, =OutputString // address to be written to
+ add r3, r0, USART_DR
+ str r3, [r1, DMA_S5PAR] // dma read is USART address
+ str r2, [r1, DMA_S5M0AR] //dma write is outputString
+ ldr r2, =OutputStringSize
+ ldr r2, [r2]
+
+ str r2, [r1, DMA_S5NDTR] // number of n-bytes to write
+ mov r2, #0x0400 // auto increment write address and keep fixed write address, mem-to-per
+ movt r2, #0x0800
+ str r2, [r1, DMA_S5CR] //configure dma transfer
+
+ mov r4, r1
+ eor r1, r1
+ str r1, [r0, USART_SR]
+
+ ldr r1, [r0, USART_CR1]
+ orr r1, r1, #0x0004 // 8 bit word and Start USART
+ str r1, [r0, USART_CR1]
+ ldr r1, [r4, DMA_S5CR]
+ orr r1, r1, #1
+ str r1, [r4, DMA_S5CR] //start dma transfer
+
+ bx lr
+
+ .size DMAUSARTReceive, .-DMAUSARTReceive
 

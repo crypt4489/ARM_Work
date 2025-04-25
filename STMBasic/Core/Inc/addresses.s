@@ -16,6 +16,7 @@
 .equ RCC_APB2RSTR, 0x40023824
 .equ RCC_APB1ENR, 0x40023840
 .equ RCC_APB2ENR, 0x40023844
+.equ RCC_BASE, 0x40023800
 .equ EXTI, 0x40013c00
 .equ NVIC_ICPR0, 0xE000E280 //clear pending nvic
 .equ GPIOA_BASE, 0x40020000
@@ -143,3 +144,23 @@
  .equ USART_CR2, 0x10
  .equ USART_CR3, 0x14
  .equ USART_GTPR, 0x18
+
+
+ .equ PWR_BASE, 0x40007000
+ .equ PWR_CR, 0x00
+ .equ PWR_CSR, 0x04
+
+
+ .equ RCC_CR, 0x00
+ .equ RCC_PLLCFGR, 0x04
+ .equ RCC_CFGR, 0x08
+ .equ RCC_CIR, 0x0c
+
+
+.equ FIR_BASE, 0x40023c00
+.equ FLASH_ACR, 0x00
+.equ FLASH_KEYR, 0x04
+.equ FLASH_OPTKEYR, 0x08
+.equ FLASH_SR, 0x0c
+.equ FLASH_CR, 0x10
+.equ FLAH_OPTCR, 0x14

@@ -489,13 +489,11 @@ LoopFillZerobss:
   cmp r2, r4
   bcc FillZerobss
 
-/* Call the clock system initialization function.*/
-  bl  SystemInit
-/* Call the application's entry point.*/
+ bl  SystemInit
 
-  BL SystemClock_Config
+ bl EstablishClockSignal
 
- bl DMAUSART
+ bl DMAUSARTReceive
 
 LABEL:
   b LABEL
