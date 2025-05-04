@@ -164,3 +164,14 @@
 .equ FLASH_SR, 0x0c
 .equ FLASH_CR, 0x10
 .equ FLAH_OPTCR, 0x14
+
+
+
+.equ SCB, 0xE000ED00
+.equ SCB_CPACR, 0x88
+
+.equ FPU_BASE, 0xE000EF30
+.equ FPU_FPCCR, 0x04
+.equ FPU_FPCAR, 0x08
+.equ FPU_FPDSCR, 0x0c
+

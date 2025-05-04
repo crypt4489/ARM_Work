@@ -50,7 +50,7 @@ TIM9_Handler:
 	STR r1, [r0]
 	ldr r1, =0x00000020
 	ldr r0, =0x40020000
-	bl  HAL_GPIO_TogglePin
+	//bl  HAL_GPIO_TogglePin
 	pop {r0-r1, lr}
 	bx lr
   .size  TIM9_Handler, .-TIM9_Handler
@@ -489,7 +489,10 @@ LoopFillZerobss:
   cmp r2, r4
   bcc FillZerobss
 
- bl  SystemInit
+ ldr r0, =SCB
+ eor r1, r1
+ movt r1, #(0x00F0)
+ str r1, [r0, SCB_CPACR]
 
  bl EstablishClockSignal
 
