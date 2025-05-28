@@ -87,7 +87,7 @@ ldr r1, [r0, RCC_CFGR]
 bic r1, r1, #(0xF3)
 bic r1, r1, #(0xFC << 8)
 orr r1, r1, #(0x02) // divide APB1 by 4, divide APB2 by 1, AHB divide by 1, SW = PLL_p
-orr r1, r1, #(0x14 << 8)
+orr r1, r1, #(0x00 << 8)
 str r1, [r0, RCC_CFGR]
 ldr r0, =FIR_BASE
 mov r1, #5

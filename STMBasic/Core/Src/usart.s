@@ -19,6 +19,8 @@
 .global DMAUSART
 .global OutputStringSize
 .global DMAUSARTReceive
+.global USARTBitBanging
+.global USARTBitBangingInt
 
 
 
@@ -36,7 +38,14 @@ TestNumber2:
 Array:
 	.byte 0, 1, 2, 3, 4, 5
 
-
+BitBangString:
+	.asciz "U"
+BitBangTransmit:
+	.byte 0
+BitBangIterator:
+	.byte 0
+BitBangIdle:
+	.byte 8
 
  .section  .text.EstablishUSART2
  .type EstablishUSART2, %function
@@ -402,3 +411,147 @@ DMAUSARTReceive:
 
  .size DMAUSARTReceive, .-DMAUSARTReceive
 
+
+  .section  .text.USARTBitBanging
+ .type USARTBitBanging, %function
+USARTBitBanging:
+
+ ldr r0, =RCC_AHB1ENR
+
+ ldr r1, [r0]
+ orr r1, r1, #0x0001 //enable GPIOA clock
+ str r1, [r0]
+
+ ldr r0, =RCC_APB1ENR
+
+ ldr r1, [r0]
+ orr r1, r1, #0x4 //enable tim4
+ str r1, [r0]
+
+ ldr r0, =GPIOA_BASE
+
+ ldr r1, [r0]
+ bic r1, r1, #(0b11 << (2 * 2))   // Clear PA2
+ orr r1, r1, #(0b01 << (2 * 2))   // Set PA2 GPIO
+ str r1, [r0]
+
+ ldr r1, [r0, #0x8]
+ bic r1, r1, #(0b11 << (2 * 2))
+ orr r1, r1, #(0b11 << (2 * 2))
+ str r1, [r0, 0x8]
+
+
+ ldr r1, [r0, #0xC]
+ bic r1, r1, #(0x3 << (2 * 2)) // clear pull up down resiter
+ orr r1, r1, #(0b01 << (2 * 2))   // Set PA2 to pull up
+ str r1, [r0, #0xC]
+
+
+ ldr r0, =TIM4_BASE
+
+ mov r1, #200                //; Prescaler = 83
+ str r1, [r0, TIM4_PSC]            // ; Store PSC
+
+ mov r1, #93
+ str r1, [r0, TIM4_ARR]
+
+  ldr r2, [r0]  //TIM4_CR1 ARR preload
+  orr r2, r2, #0x0080
+  str r2, [r0]
+
+  ldr r2, [r0, TIM4_EGR]  //TIM4_CR1 write to shadow regs
+  orr r2, r2, #0x0001
+  str r2, [r0, TIM4_EGR]
+
+
+  ldr r1, [r0, TIM4_DIER]
+  orr r1, r1, #0x0001
+  str r1, [r0, TIM4_DIER]
+
+
+  ldr r2, [r0]  //TIM9_CR1 enable timer
+  orr r2, r2, #0x0001
+  str r2, [r0]
+
+  ldr r1, =NVIC_ISER0 // interrupt set enable for NVIC
+  mov r2, #1 << 30
+  str r2, [r1]
+
+
+ bx lr
+.size USARTBitBanging, .-USARTBitBanging
+
+.section .text.USARTBitBangingInt
+  	.type USARTBitBangingInt, %function
+USARTBitBangingInt:
+
+LDR r0, =TIM4_BASE
+  LDR r1, [r0, TIM4_SR]
+  BIC r1, r1, #0x0001
+  STR r1, [r0, TIM4_SR]
+  LDR r0, =NVIC_ICPR0
+  MOV r1, #(1 << 30)
+  STR r1, [r0]
+
+  ldr r0, =BitBangIterator
+  ldr r1, [r0] // load iterator
+
+
+
+  ldr r4, =BitBangTransmit
+  ldr r5, [r4]
+
+  ldr r6, =GPIOA_BASE
+  ldr r2, =BitBangIdle
+  ldrb r3, [r2]
+ // cmp r3, #10
+ // beq updateandout
+  cmp r3, #0
+  beq starttransmission
+  ldr r7, [r6, GPIO_BSRR]
+  orr r7, r7, #(1 << 2)
+  str r7, [r6, GPIO_BSRR]
+  sub r3, r3, 1
+  strb r3, [r2]
+  b updateandout
+starttransmission:
+
+  cmp r5, #0
+  bne transmitdatabyte
+sendstartbit:
+  mov r5, #1
+  str r5, [r4]
+  ldr r7, [r6, GPIO_BSRR]
+  orr r7, r7, #(1 << 18)
+  str r7, [r6, GPIO_BSRR]
+  b updateandout
+transmitdatabyte:
+  cmp r1, #8
+  beq sendendbit
+  ldr r2, =BitBangString
+  ldrb r3, [r2]
+  lsr r3, r3, r1
+  and r3, r3, #1
+  ldr r7, [r6, GPIO_ODR]
+  lsl r3, r3, #2
+  bic r7, r7, #4
+  orr r7, r7, r3
+  str r7, [r6, GPIO_ODR]
+  add r1, r1, #1
+  b updateandout
+
+sendendbit:
+  mov r5, #0
+  str r5, [r4]
+  mov r1, #0
+  ldr r7, [r6, GPIO_BSRR]
+  orr r7, r7, #(1 << 2)
+  str r7, [r6, GPIO_BSRR]
+  mov r3, #8
+  strb r3, [r2]
+updateandout:
+  strb r1, [r0] // iterator update
+
+
+  bx lr
+.size USARTBitBangingInt, .-USARTBitBangingInt

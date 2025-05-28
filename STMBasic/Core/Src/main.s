@@ -491,12 +491,12 @@ LoopFillZerobss:
 
  ldr r0, =SCB
  eor r1, r1
- movt r1, #(0x00F0)
+ movt r1, #(0x00F0)  // give full access to fpu registers
  str r1, [r0, SCB_CPACR]
 
  bl EstablishClockSignal
 
- bl DMAUSARTReceive
+ bl USARTBitBanging
 
 LABEL:
   b LABEL
@@ -776,8 +776,8 @@ g_pfnVectors:
    .weak      TIM3_IRQHandler
    .thumb_set TIM3_IRQHandler,Default_Handler
 
- //  .weak      TIM4_IRQHandler
-//   .thumb_set TIM4_IRQHandler,Default_Handler
+   .weak      TIM4_IRQHandler
+   .thumb_set TIM4_IRQHandler,USARTBitBangingInt
 
    .weak      I2C1_EV_IRQHandler
    .thumb_set I2C1_EV_IRQHandler,Default_Handler

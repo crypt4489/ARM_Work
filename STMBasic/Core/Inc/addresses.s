@@ -22,6 +22,20 @@
 .equ GPIOA_BASE, 0x40020000
 .equ GPIOB_BASE, 0x40020400
 
+//gpio
+
+.equ GPIO_MODER, 0x00
+.equ GPIO_OTYPER, 0x04
+.equ GPIO_OSPEEDR, 0x08
+.equ GPIO_PUPDR, 0x0c
+.equ GPIO_IDR, 0x10
+.equ GPIO_ODR, 0x14
+.equ GPIO_BSRR, 0x18
+.equ GPIO_LCKR, 0x1c
+.equ GPIO_AFRL, 0x20
+.equ GPIO_AFRH, 0x24
+
+
 //tim4 registers
 .equ TIM4_BASE, 0x40000800
 .equ TIM4_CR1, 0x00
@@ -76,13 +90,13 @@
 .equ ADC_CDR, 0x308
 
 
- .equ DMA1_BASE, 0x40026000
- .equ DMA2_BASE, 0x40026400
- .equ DMA_LISR, 0x00
- .equ DMA_HISR, 0x04
- .equ DMA_LIFCR, 0x08
- .equ DMA_HIFCR, 0x0C
- .equ DMA_S0CR, 0x10
+.equ DMA1_BASE, 0x40026000
+.equ DMA2_BASE, 0x40026400
+.equ DMA_LISR, 0x00
+.equ DMA_HISR, 0x04
+.equ DMA_LIFCR, 0x08
+.equ DMA_HIFCR, 0x0C
+.equ DMA_S0CR, 0x10
 .equ DMA_S0NDTR, 0x14
 .equ DMA_S0PAR, 0x18
 .equ DMA_S0M0AR, 0x1c
