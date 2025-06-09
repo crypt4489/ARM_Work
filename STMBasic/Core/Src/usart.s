@@ -39,7 +39,7 @@ Array:
 	.byte 0, 1, 2, 3, 4, 5
 
 BitBangString:
-	.asciz "U"
+	.asciz "a"
 BitBangTransmit:
 	.byte 0
 BitBangIterator:

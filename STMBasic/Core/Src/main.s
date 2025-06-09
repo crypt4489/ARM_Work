@@ -496,7 +496,11 @@ LoopFillZerobss:
 
  bl EstablishClockSignal
 
- bl USARTBitBanging
+ bl canBUSInit
+
+ mov r0, 55
+
+ bl canBUSTransmit
 
 LABEL:
   b LABEL
