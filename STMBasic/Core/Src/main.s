@@ -20,6 +20,7 @@
   .thumb
 
 .include "addresses.s"
+.include "canbus_addresses.s"
 
 .global  g_pfnVectors
 .global  Default_Handler
@@ -496,9 +497,32 @@ LoopFillZerobss:
 
  bl EstablishClockSignal
 
+ ldr r0, =0
+
+ bl canBUSPeripheralInit
+
+ ldr r0, =CAN1_BASE
+
  bl canBUSInit
 
- mov r0, 55
+ mov r1, #0 //filter number
+ mov r2, #0 //identifier mode
+ mov r3, #1 //config bit
+ mov r4, #0 //fifo assignment
+ mov r5, #1 //filter id
+ mov r6, #(0x7ff) //filter mask
+
+ push {r1-r6}
+
+ mov r1, sp
+
+ bl canFilterSet
+
+ pop {r1-r6}
+
+ bl canExitInit
+
+ mov r0, 123
 
  bl canBUSTransmit
 

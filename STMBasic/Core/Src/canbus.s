@@ -5,19 +5,29 @@
 .include "canbus_addresses.s"
 .include "addresses.s"
 
+.global canBUSPeripheralInit
 .global canBUSInit
 .global canBUSTransmit
+.global canExitInit
+.global canFilterSet
 
 
-.section .text.canBUSInit
-  	.type canBUSInit, %function
-canBUSInit:
+.section .text.canBUSPeripheralInit
+  	.type canBUSPeripheralInit, %function
+canBUSPeripheralInit:
 
-	ldr r0, =RCC_AHB1ENR
 
- 	ldr r1, [r0]
- 	orr r1, r1, #0x0001 //enable GPIOA clock
- 	str r1, [r0]
+ 	ldr r1, =RCC_AHB1ENR
+
+ 	cmp r0, #0
+
+ 	bne CANBUSBPINIT
+
+CANBUSAPINIT:
+
+ 	ldr r2, [r1]
+ 	orr r2, r2, #0x0001 //enable GPIOA clock
+ 	str r2, [r1]
 
  	ldr r0, =GPIOA_BASE
 
@@ -33,69 +43,167 @@ canBUSInit:
  	str r1, [r0, #0xC]
 
  	ldr r1, [r0, GPIO_AFRH]
+
  	mov r2, #(9 << 12)
  	movt r2, #9
 
  	orr r1, r1, r2
  	str r1, [r0, GPIO_AFRH]
 
-
-	ldr r0, =RCC_APB1ENR
+ 	ldr r0, =RCC_APB1ENR
 	ldr r1, [r0]
-	orr r1, r1, #(1 << 25)
+	orr r1, r1, #(1 << 25) // enable CANBUSA Clock
 	str r1, [r0]
 
-	ldr r0, =CAN1_BASE
+	b CANBUSPEND
+
+CANBUSBPINIT:
+	ldr r2, [r1]
+ 	orr r2, r2, #0x0002 //enable GPIOB clock
+ 	str r2, [r1]
+
+ 	ldr r0, =GPIOB_BASE
+
+ 	ldr r1, [r0, GPIO_MODER]
+ 	bic r1, r1, #(0b1111 << (12 * 2))   // Clear Pb12/13
+    orr r1, r1, #(0b1010 << (12 * 2))   // Set pb12/13 alternate
+    str r1, [r0, GPIO_MODER]
+
+
+ 	ldr r1, [r0, GPIO_PUPDR]
+ 	bic r1, r1, #(0x33 << (12 * 2)) // clear pull up resiter
+ 	orr r1, r1, #(0b0101 << (12 * 2))   // Set pb12/13 to pull up
+ 	str r1, [r0, GPIO_PUPDR]
+
+ 	ldr r1, [r0, GPIO_AFRH]
+ 	movt r2, #0x99
+ 	orr r1, r1, r2
+ 	str r1, [r0, GPIO_AFRH]
+
+ 	ldr r0, =RCC_APB1ENR
+	ldr r1, [r0]
+	orr r1, r1, #(1 << 26) // enable CANBUSB Clock
+	str r1, [r0]
+
+CANBUSPEND:
+ 	bx lr
+
+ .size  canBUSPeripheralInit, .-canBUSPeripheralInit
+
+.section .text.canBUSInit
+  	.type canBUSInit, %function
+canBUSInit:
+
 	ldr r1, [r0, CAN_MCR]
 	bic r1, r1, #0x2
+	str r1, [r0, CAN_MCR] //clear sleep
 
-	str r1, [r0, CAN_MCR] //request initiialization
+SLEEPLOOP:
+	ldr r1, [r0, CAN_MSR]
+	and r2, r1, #2
+	cmp r2, #0
+	beq SLEEPLOOP
+
+	ldr r1, [r0, CAN_MCR]
 	orr r1, r1, #0x0001
-	str r1, [r0, CAN_MCR]
+	str r1, [r0, CAN_MCR] // request initialization
 ACKLoop:
 	ldr r1, [r0, CAN_MSR]
 	and r2, r1, #1
 	cmp r2, #0
 	beq ACKLoop //now in initializationb mode
-	//ldr r1, =#0x00000
-	//ldr r2, [r0, CAN_MCR]
-	//movt r2, 0
-	//str r2, [r0, CAN_MCR] // setup debug mode
 
 	ldr r1, =#0x403c0004  //prescalar of 5 (4+1), TS1 of 14 (14+1) and TS2 of 2(3+1), SJW is 1
 	str r1, [r0, CAN_BTR] // set up for 500 k bit and set in loop back mode
 
 
-	ldr r1, [r0, CAN_FM1R]
-	bic r1, r1, #1
-	str r1, [r0, CAN_FM1R] // set identifier mode to mask mde
 
-	ldr r1, [r0, CAN_FS1R]
-	orr r1, r1, #1
-	str r1, [r0, CAN_FS1R] // set to single 32-bit config
 
-	ldr r1, [r0, CAN_FFA1R]
-	bic r1, r1, #1
-	str r1, [r0, CAN_FFA1R] // set to single 32-bit config
 
-	mov r1, #0
-	movt r1, (0x1 << 5)
-	str r1, [r0, CAN_F0R1] //set fdilter id of only one
 
-	mov r1, #0
-	movt r1, (0x7ff << 5)
-	str r1, [r0, CAN_F0R2] //set can filter to match all 11 bits
+	bx lr
 
-	ldr r1, [r0, CAN_FA1R]
-	orr r1, r1, #0x1
-	str r1, [r0, CAN_FA1R] //activate filer
+ .size  canBUSInit, .-canBUSInit
+
+.section .text.canFilterSet
+  .type canFilterSet, %function
+canFilterSet:
+//r0 can address,
+//r1 address of following values
+
+//r1 filter number
+//r2 identifier mode
+//r3 mode config
+//r4 fifo assignment
+//r5 fitler id
+//r6 filter mask
+
+	ldr r6, [r1, #20]
+	ldr r5, [r1, #16]
+	ldr r4, [r1, #12]
+	ldr r3, [r1, #8]
+	ldr r2, [r1, #4]
+	ldr r1, [r1]
+
+	ldr r7, [r0, CAN_FA1R]
+	mov r8, #1
+	lsl r8, r8, r1
+	bic r7, r7, r8
+	str r7, [r0, CAN_FA1R]
+
+
+	ldr r7, [r0, CAN_FM1R]
+	ldr r9, [r0, CAN_FS1R]
+	ldr r11, [r0, CAN_FFA1R]
+	mov r8, #1
+	lsl r8, r8, r1
+	bic r7, r7, r8
+	bic r9, r9, r8
+	bic r11, r11, r8
+	lsl r8, r2, r1
+	lsl r10, r3, r1
+	lsl r12, r4, r1
+	orr r7, r7, r8
+	orr r9, r9, r10
+	orr r11, r11, r12
+	str r7, [r0, CAN_FM1R] // set identifier mode to mask mde
+	str r9, [r0, CAN_FS1R] // set to single 32-bit config
+	str r11, [r0, CAN_FFA1R]
+
+	ldr r2, =CAN_F0R1
+	mov r3, #8
+	mul r3, r3, r1 //address of canfilter register
+	add r3, r3, r2
+
+	lsl r5, r5, #21
+	str r5, [r0, r3] //set fdilter id of only one
+
+	add r3, r3, #4
+	lsl r6, r6, #21
+	str r6, [r0, r3] //set can filter to match all 11 bits
+
+	ldr r2, [r0, CAN_FA1R]
+	mov r3, #1
+	lsl r3, r3, r1
+	orr r2, r2, r3
+	str r2, [r0, CAN_FA1R] //activate filer
+
+	bx lr
+
+.size  canFilterSet, .-canFilterSet
+
+
+
+.section .text.canExitInit
+  .type canExitInit, %function
+
+canExitInit:
 
 	ldr r1, [r0, CAN_FMR]
 	bic r1, r1, #1
 	str r1, [r0, CAN_FMR] //end the filter setup init
 
-
-	ldr r1, [r0, CAN_MCR]
+  	ldr r1, [r0, CAN_MCR]
 	bic r1, r1, #1
 	str r1, [r0, CAN_MCR] //request normal mode
 ACKLoop2:
@@ -105,7 +213,8 @@ ACKLoop2:
 	bne ACKLoop2 // entered normal mode
 	bx lr
 
- .size  canBUSInit, .-canBUSInit
+ .size  canExitInit, .-canExitInit
+
 
 .section .text.canBUSTransmit
   .type canBUSTransmit, %function
