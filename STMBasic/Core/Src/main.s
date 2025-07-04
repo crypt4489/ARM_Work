@@ -39,6 +39,13 @@ defined in linker script */
 /* stack used for SystemInit_ExtMemCtl; always internal RAM used */
 
 
+ .section .data
+CANSTRING1:
+    .asciz "LKJN"
+CANSTRING2:
+    .asciz "UUUU"
+
+
     .section  .text.TIM9_Handler
 TIM9_Handler:
 	PUSH {r0-r1, lr}
@@ -522,9 +529,22 @@ LoopFillZerobss:
 
  bl canExitInit
 
- mov r0, 123
+ mov r1, #0 //mailbox #
+ mov r2, #1 //identifier
+ mov r3, #4 //datalength
+ ldr r4, =CANSTRING1 //address of data
 
  bl canBUSTransmit
+
+ ldr r1, =CANSTRING2 //address to write
+ mov r2, #0 // mailbox id
+ mov r3, #1
+
+ push {r0}
+
+ bl canBUSReceive
+
+ pop {r0}
 
 LABEL:
   b LABEL

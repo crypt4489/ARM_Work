@@ -10,6 +10,7 @@
 .global canBUSTransmit
 .global canExitInit
 .global canFilterSet
+.global canBUSReceive
 
 
 .section .text.canBUSPeripheralInit
@@ -219,26 +220,131 @@ ACKLoop2:
 .section .text.canBUSTransmit
   .type canBUSTransmit, %function
 canBUSTransmit:
-	ldr r1, =CAN1_BASE
+
+// r0 cnabase
+// r1 mailbox
+// r2 identifier
+// r3 datalength
+// r4 address of data
+
+
+	add r5, r0, CAN_TI0R
+	mov r6, #0x10
+	mla r7, r6, r1, r5
 transmitempty:
-	ldr r2, [r1, CAN_TI0R]
-	and r3, r2, #1
-	cmp r3, #1
+	ldr r8, [r7]
+	and r8, r8, #1
+	cmp r8, #1
 	beq transmitempty
 
-	mov r2, #1
-	str r2, [r1, CAN_TDT0R] //set data frame length
-	and r0, r0, #0xff
-	str r0, [r1, CAN_TDL0R] //set data
+	add r5, r0, CAN_TDT0R
+	mla r8, r6, r1, r5
 
-	mov r2, #1
-	movt r2, #0x0020
-	//mov r2, #0
-	//str r2, [r1, CAN_RI0R] // setup identifier
 
-	str r2, [r1, CAN_TI0R] // start message with identifier of 1
+	and r3, r3, #0xf
+
+	str r3, [r8] //set data frame length
+
+	add r5, r0, CAN_TDL0R
+	mla r8, r6, r1, r5
+	mov r9, r4
+	mov r11, #0
+	mov r12, #0
+	b copytransmitloopcheck
+copytransmitloop:
+	ldrb r10, [r9]
+	lsl r10, r10, r12
+	add r11, r11, r10
+	add r12, r12, #8
+    cmp r12, #32
+    bne transmitmovenext
+    str r11, [r8]
+    add r8, r8, #4
+    mov r12, #0
+    mov r11, #0
+transmitmovenext:
+	add r9, r9, #1
+	sub r3, r3, #1
+copytransmitloopcheck:
+	cmp r3, #0
+	bne copytransmitloop
+    cmp r12, #0
+    beq transmitend
+	str r11, [r8]
+transmitend:
+	mov r8, #1
+	lsl r9, r2, #21
+    orr r9, r9, r8
+
+
+	str r9, [r7] // start message with identifier of 1
 	bx lr
 
  .size  canBUSTransmit, .-canBUSTransmit
 
+
+
+ .section .text.canBUSReceive
+  .type canBUSReceive, %function
+canBUSReceive:
+
+//r0 can base
+//r1 address to write data
+//r2 mailbox id
+//r3 identifer
+
+	ldr r4, =CAN_RI0R
+	mov r5, #0x10
+	cmp r2, #0
+	blt byidentifier
+	mla r4, r5, r2, r4
+	add r5, r4, r0
+	b read_data
+
+byidentifier:
+	ldr r6, [r4]
+	lsr r6, r6, #21
+	cmp r6, r3
+	beq endidentifier
+byidentifier2:
+   	add r4, r5, r4
+   	ldr r6, [r4]
+	lsr r6, r6, #21
+	cmp r6, r3
+	beq endidentifier
+	mov r0, #-1
+	bx lr
+endidentifier:
+	add r5, r0, r4
+
+read_data:
+	ldr r6, [r5, #4]
+	and r6, r6, #0xf
+	mov r7, r1
+	add r8, r5, #8
+	b loopcondition
+copydataloop:
+    ldr r9, [r8]
+    mov r10, #4
+bytecopyloop:
+
+	uxtb r11, r9
+	lsr r9, r9, #8
+	sub r10, r10, #1
+	strb r11, [r7]
+	add r7, r7, #1
+	sub r6, r6, #1
+	cmp r6, #0
+	beq receiveend
+	cmp r10, #0
+	bne bytecopyloop
+
+loopcondition:
+	cmp r6, #0
+	bne copydataloop
+receiveend:
+	mov r0, #0
+	bx lr
+
+ .size  canBUSReceive, .-canBUSReceive
 
