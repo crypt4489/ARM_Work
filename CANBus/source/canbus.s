@@ -294,6 +294,7 @@ canBUSReceive:
 //r3 identifer
 
 	ldr r4, =CAN_RI0R
+
 	mov r5, #0x10
 	cmp r2, #0
 	blt byidentifier
@@ -302,13 +303,15 @@ canBUSReceive:
 	b read_data
 
 byidentifier:
-	ldr r6, [r4]
+	add r7, r4, r0
+	ldr r6, [r7]
 	lsr r6, r6, #21
 	cmp r6, r3
 	beq endidentifier
 byidentifier2:
    	add r4, r5, r4
-   	ldr r6, [r4]
+   	add r7, r4, r0
+   	ldr r6, [r7]
 	lsr r6, r6, #21
 	cmp r6, r3
 	beq endidentifier

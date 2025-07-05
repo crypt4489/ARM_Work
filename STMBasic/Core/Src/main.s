@@ -537,7 +537,7 @@ LoopFillZerobss:
  bl canBUSTransmit
 
  ldr r1, =CANSTRING2 //address to write
- mov r2, #0 // mailbox id
+ movs r2, #-1 // mailbox id
  mov r3, #1
 
  push {r0}
