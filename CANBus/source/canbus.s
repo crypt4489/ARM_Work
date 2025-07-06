@@ -13,6 +13,10 @@
 .global canBUSReceive
 
 
+.section .canbus
+FirstWord:
+	.word 0xFF, 0xFE, 0xFD
+
 .section .text.canBUSPeripheralInit
   	.type canBUSPeripheralInit, %function
 canBUSPeripheralInit:
