@@ -529,6 +529,17 @@ LoopFillZerobss:
 
  bl canExitInit
 
+ ldr r0, =_end
+ mov r1, #10
+
+ bl canFSMInit
+
+ ldr r0, =CANSTRING1
+ mov r1, #4
+ mov r2, #0x1
+
+ bl createTransmitMessageBlk
+/*
  mov r1, #0 //mailbox #
  mov r2, #1 //identifier
  mov r3, #4 //datalength
@@ -544,7 +555,7 @@ LoopFillZerobss:
 
  bl canBUSReceive
 
- pop {r0}
+ pop {r0} */
 
 LABEL:
   b LABEL

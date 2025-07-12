@@ -138,8 +138,9 @@ SECTIONS
   {
     . = ALIGN(4);
     _sdata = .;        /* create a global symbol at data start */
-    *(.canbus)		   /* create canbus fsm area */
+   
     *(.data)           /* .data sections */
+    *(.canbus)		   /* create canbus fsm area */
     *(.data*)          /* .data* sections */
     *(.RamFunc)        /* .RamFunc sections */
     *(.RamFunc*)       /* .RamFunc* sections */
