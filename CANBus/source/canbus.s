@@ -17,6 +17,7 @@
 .global createTransmitMessageBlk
 .global copyBlockToCanBUSTransmitter
 .global copyBlockFSM
+.global manageTransmitBuffer
 
 .equ CANBUSRECEIVEBLKSIZE, 0x10
 .equ CANBUSTRANSMITBLKSIZE, 0x10
@@ -192,17 +193,17 @@ packloopcondition:
 	cmp r6, #0
 	bne packcopydataloop
 packreceiveend:
-	push {r0-r2, lr}
+
 	ldr r0, =ReceiveBuffer
 	mov r1, CANBUSRECEIVEBLKSIZE
 	mov r2, RECEIVEBUFFERCURR
-
+	push {r0-r2, lr}
 	bl moveFSMCurrForward
-
+	pop {r0-r2, lr}
 	ldr r0, =ByteBuffer
 	mov r1, #8
 	mov r2, BYTEBUFFERCURR
-
+	push {r0-r2, lr}
 	bl moveFSMCurrForward
 	pop {r0-r2, lr}
 	pop {r2-r11}
@@ -319,33 +320,74 @@ bcstarttransmission:
 copyBlockFSM:
 //r0 cann addr
 //r1 transmit blk to copy to
-	ldr r2, =TransmitBuffer
-	ldr r3, [r2, TRANSMITBUFFERREAD]
-	push {r0-r2, lr}
-	mov r2, r3
 
+	push {r2-r6}
+
+	ldr r2, =TransmitBuffer
+	ldr r2, [r2, TRANSMITBUFFERREAD]
+
+	push {r0-r2, lr}
 	bl copyBlockToCanBUSTransmitter
 
 	pop {r0-r2, lr}
 
-	ldr r4, [r3, CANBUSTRANSMITFID] //gett id with done flag
-	mov r5, #1
-	lsl r5, r5, #31
-	and r4, r5, r4
+	ldr r3, [r2, CANBUSTRANSMITADDR]
+	ldr r4, [r2, CANBUSTRANSMITCURR]
+	ldr r5, [r2, CANBUSTRANSMITSIZE]
+	add r3, r5, r3
 	mov r6, #0
-	cmp r4, #0
-	beq readheadtransmove
-	push {r0-r2, lr}
-	mov r0, r2
+	cmp r4, r3
+	bne readheadtransmove
+
+	ldr r0, =TransmitBuffer
 	mov r1, CANBUSTRANSMITBLKSIZE
 	mov r2, TRANSMITBUFFERREAD
+	push {r0-r2, lr}
 	bl moveFSMCurrForward
 	pop {r0-r2, lr}
 	mov r6, #1
 readheadtransmove:
 	mov r0, r6
+	pop {r2-r6}
 	bx lr
 .size copyBlockFSM, .-copyBlockFSM
+
+.section .text.manageTransmitBuffer
+	.type manageTransmitBuffer, %function
+manageTransmitBuffer:
+
+// r0 CAN ADDR
+
+	push {r1-r5}
+	add r1, r0, CAN_TSR
+	ldr r2, [r1]
+	mov r3, #0
+	movt r3, #0x1C00
+	and r2, r3, r2
+	lsr r2, r2, #26
+	movs r4, #-1
+manageloop:
+	adds r4, r4, #1
+	and r5, r2, #1
+	cmp r5, #0
+	bne callcopyblockmanage
+	lsr r2, r2, #1
+checkmanageloop:
+	cmp r2, #0
+	bne manageloop
+	movs r0, #-1
+	b endmanage
+callcopyblockmanage:
+	mov r1, r4
+	push {r0-r1, lr}
+	bl copyBlockFSM
+	pop {r0-r1, lr}
+	mov r0, #0
+endmanage:
+	pop {r1-r5}
+	bx lr
+
+.size manageTransmitBuffer, .-manageTransmitBuffer
 
 
 .section .text.canBUSPeripheralInit

@@ -535,10 +535,25 @@ LoopFillZerobss:
  bl canFSMInit
 
  ldr r0, =CANSTRING1
- mov r1, #4
+ mov r1, #12
  mov r2, #0x1
 
  bl createTransmitMessageBlk
+
+
+ ldr r0, =CAN1_BASE
+
+ push {r0}
+
+ bl manageTransmitBuffer
+
+ pop {r0}
+
+ mov r1, #0
+
+ bl packReceivedMessageInBuffer
+
+
 /*
  mov r1, #0 //mailbox #
  mov r2, #1 //identifier
