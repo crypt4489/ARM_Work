@@ -549,9 +549,8 @@ LoopFillZerobss:
 
  pop {r0}
 
- mov r1, #0
 
- bl packReceivedMessageInBuffer
+ bl manageReceiveBuffer
 
 
 /*

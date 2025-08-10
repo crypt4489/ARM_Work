@@ -10,6 +10,7 @@
 .global canBUSTransmit
 .global canExitInit
 .global canFilterSet
+.global canInterruptSetup
 .global canBUSReceive
 .global canFSMInit
 .global moveFSMCurrForward
@@ -18,13 +19,15 @@
 .global copyBlockToCanBUSTransmitter
 .global copyBlockFSM
 .global manageTransmitBuffer
+.global manageReceiveBuffer
+.global retrieveMessageBlock
 
 .equ CANBUSRECEIVEBLKSIZE, 0x10
 .equ CANBUSTRANSMITBLKSIZE, 0x10
 
 .equ CANBUSRECEIVETS, 0x00
 .equ CANBUSRECEIVEFID, 0x04
-.equ CANBUSRECEIVEDL, 0x08
+.equ CANBUSRECEIVESIZE, 0x08
 .equ CANBUSRECEIVEADDR, 0x0C
 
 .equ CANBUSTRANSMITSIZE, 0x00
@@ -32,19 +35,26 @@
 .equ CANBUSTRANSMITCURR, 0x08
 .equ CANBUSTRANSMITFID, 0x0C
 
+.equ CANBUSRECEIVERETBLKID, 0x00
+.equ CANBUSRECEIVERETBLKSIZE, 0x04
+.equ CANBUSRECEIVERETBLKDATA, 0x08
+
 .equ RECEIVEBUFFERADDR, 0x00
 .equ RECEIVEBUFFERCURR, 0x04
 .equ RECEIVEBUFFERSIZE, 0x08
 .equ RECEIVEBUFFERREAD, 0x0C
+.equ RECEIVEBUFFERCOUNT, 0x10
 
 .equ BYTEBUFFERADDR, 0x00
 .equ BYTEBUFFERCURR, 0x04
 .equ BYTEBUFFERSIZE, 0x08
+.equ BYTEBUFFERCOUNT, 0x10
 
 .equ TRANSMITBUFFERADDR, 0x00
 .equ TRANSMITBUFFERCURR, 0x04
 .equ TRANSMITBUFFERSIZE, 0x08
 .equ TRANSMITBUFFERREAD, 0x0C
+.equ TRANSMITBUFFERCOUNT, 0x10
 
 /* struct receiveblock {
   u32 timestamp
@@ -61,6 +71,18 @@
 	u32 filter
 	}
 */
+
+/*
+struct receivepopblovk
+{
+	u32 id
+	u32 length
+	u8 data[8]
+};
+
+
+
+*/
 .section .canbus
 ReceiveBuffer:
 	.word 0x02
@@ -70,11 +92,15 @@ ReceiveBufferSize:
 	.word 0x00
 ReceiveBufferRead:
 	.word 0x00
+ReceiveBufferCount:
+	.word 0x0
 ByteBuffer:
 	.word 0x00
 ByteBufferPointer:
 	.word 0x00
 ByteBufferSize:
+	.word 0x00
+ByteBufferCount:
 	.word 0x00
 TransmitBuffer:
 	.word 0xFFFFFFFF
@@ -84,6 +110,8 @@ TransmitBufferSize:
 	.word 0xFFFFDDDD
 TransmitBufferRead:
 	.word 0xFFFFCCCC
+TransmitBufferCount:
+	.word 0x0
 
 
 
@@ -151,15 +179,28 @@ packReceivedMessageInBuffer:
 //r0 canbase
 //r1 receive index
 	push {r2-r11}
+
+	ldr r4, =ReceiveBufferPointer //cuurent pointer
+	ldr r2, [r4, RECEIVEBUFFERCOUNT]
+	mov r3, CANBUSRECEIVEBLKSIZE
+	mul r3, r3, r2
+	ldr r2, [r4, RECEIVEBUFFERSIZE]
+	cmp r2, r3
+	bne readmessagrbuffer
+
+	movs r0, #-1
+	bx lr
+
+
+readmessagrbuffer:
 	ldr r2, =CAN_RI0R
 	mov r3, #0x10
 	add r2, r2, r0
 	mla r2, r3, r1, r2 //get reception address
 
-	ldr r4, =ReceiveBufferPointer //cuurent pointer
-	ldr r4, [r4]
+	ldr r4, [r4, RECEIVEBUFFERCURR]
 	ldr r5, =ByteBufferPointer
-	ldr r5, [r5]
+	ldr r5, [r5, BYTEBUFFERCURR]
 	ldr r3, [r2]
 	lsr r3, r3, #21
 	str r3, [r4, CANBUSRECEIVEFID]
@@ -167,7 +208,7 @@ packReceivedMessageInBuffer:
 	and r6, r3, #0xf
 	lsr r3, r3, #16
 	str r3, [r4, CANBUSRECEIVETS]
-	str r6, [r4, CANBUSRECEIVEDL]
+	str r6, [r4, CANBUSRECEIVESIZE]
 	str r5, [r4, CANBUSRECEIVEADDR] //store in message buffer
 
 	mov r3, r5 //set up temp ptr
@@ -195,6 +236,9 @@ packloopcondition:
 packreceiveend:
 
 	ldr r0, =ReceiveBuffer
+	ldr r1, [r0, RECEIVEBUFFERCOUNT]
+	add r1, r1, #1
+	str r1, [r0, RECEIVEBUFFERCOUNT]
 	mov r1, CANBUSRECEIVEBLKSIZE
 	mov r2, RECEIVEBUFFERCURR
 	push {r0-r2, lr}
@@ -207,6 +251,7 @@ packreceiveend:
 	bl moveFSMCurrForward
 	pop {r0-r2, lr}
 	pop {r2-r11}
+	mov r0, #0
 	bx lr
 
 .size packReceivedMessageInBuffer, .-packReceivedMessageInBuffer
@@ -219,9 +264,19 @@ createTransmitMessageBlk:
 //r1 data size
 //r2 filter
 
-	push {r3-r4}
+	push {r3-r5}
 	ldr r3, =TransmitBuffer
-	ldr r4, [r3, #4]
+	ldr r4, [r3, TRANSMITBUFFERCOUNT]
+	mov r5, CANBUSTRANSMITBLKSIZE
+	mul r5, r5, r4
+	ldr r5, [r3, TRANSMITBUFFERSIZE]
+	cmp r4, r5
+	bne nooverflowoftbuffer
+	mov r0, #-1
+	bx lr
+
+nooverflowoftbuffer:
+	ldr r4, [r3, TRANSMITBUFFERCURR]
 	str r1, [r4, CANBUSTRANSMITSIZE]
 	str r0, [r4, CANBUSTRANSMITADDR]
 	str r0, [r4, CANBUSTRANSMITCURR]
@@ -232,7 +287,11 @@ createTransmitMessageBlk:
 	mov r2, TRANSMITBUFFERCURR
 	bl moveFSMCurrForward
 	pop {r0-r2, lr}
+	ldr r2, [r3, TRANSMITBUFFERCOUNT]
+	add r2, r2, #1
+	str r2, [r3, TRANSMITBUFFERCOUNT]
 	pop {r3-r4}
+	mov r0, #0
 	bx lr
 
 .size createTransmitMessageBlk, .-createTransmitMessageBlk
@@ -340,6 +399,9 @@ copyBlockFSM:
 	bne readheadtransmove
 
 	ldr r0, =TransmitBuffer
+	ldr r1, [r0, TRANSMITBUFFERCOUNT]
+	sub r1, r1, #1
+	str r1, [r0, TRANSMITBUFFERCOUNT]
 	mov r1, CANBUSTRANSMITBLKSIZE
 	mov r2, TRANSMITBUFFERREAD
 	push {r0-r2, lr}
@@ -366,29 +428,121 @@ manageTransmitBuffer:
 	and r2, r3, r2
 	lsr r2, r2, #26
 	movs r4, #-1
-manageloop:
+	b checktmanageloop
+tmanageloop:
 	adds r4, r4, #1
 	and r5, r2, #1
 	cmp r5, #0
-	bne callcopyblockmanage
+	bne callcopyblocktmanage
 	lsr r2, r2, #1
-checkmanageloop:
+checktmanageloop:
 	cmp r2, #0
-	bne manageloop
+	bne tmanageloop
 	movs r0, #-1
-	b endmanage
-callcopyblockmanage:
+	b endtmanage
+callcopyblocktmanage:
 	mov r1, r4
 	push {r0-r1, lr}
 	bl copyBlockFSM
 	pop {r0-r1, lr}
 	mov r0, #0
-endmanage:
+endtmanage:
 	pop {r1-r5}
 	bx lr
 
 .size manageTransmitBuffer, .-manageTransmitBuffer
 
+
+.section .text.manageReceiveBuffer
+	.type manageReceiveBuffer, %function
+manageReceiveBuffer:
+
+// r0 CAN_ADDR
+
+	add r1, r0, CAN_RF0R
+	mov r2, #0 //
+	ldr r3, [r1]
+	and r3, r3, #3
+	cmp r3, #0
+	bne getmessagesfromrfifo
+	add r2, r2, #1
+	add r1, r1, #4
+	ldr r3, [r1]
+	and r3, r3, #3
+	cmp r3, #0
+	bne getmessagesfromrfifo
+
+	movs r0, #-1
+	bx lr
+
+getmessagesfromrfifo:
+	mov r4, r1
+	mov r1, r2
+	mov r2, r3
+	movt r5, #0
+	mov r5, #0x0020
+rmessagesloop:
+	push {r0-r1, lr}
+	bl packReceivedMessageInBuffer
+	pop {r0-r1, lr}
+	ldr r6, [r4]
+	orr r6, r5, r6
+	str r6, [r4]
+checkrmessagesloop:
+	sub r2, r2, #1
+	cmp r2, #0
+	bne rmessagesloop
+	mov r0, #0
+ 	bx lr
+.size manageReceiveBuffer, .-manageReceiveBuffer
+
+
+.section .text.retrieveMessageBlock
+	.type retrieveMessageBlock, %function
+retrieveMessageBlock:
+//r0 address to move the structure to
+	ldr r1, =ReceiveBufferPointer
+	ldr r2, [r1, RECEIVEBUFFERCOUNT]
+	cmp r2, #0
+	bne proceedwithpoppingrblk
+	movs r0, #-1
+	bx lr
+
+proceedwithpoppingrblk:
+	sub r2, r2, #1
+	str r2, [r1, RECEIVEBUFFERCOUNT]
+	ldr r2, [r1, RECEIVEBUFFERREAD]
+	ldr r3, [r2, CANBUSRECEIVEFID]
+	str r3, [r0, CANBUSRECEIVERETBLKID]
+	ldr r3, [r2, CANBUSRECEIVERETBLKSIZE]
+	str r3, [r0, CANBUSRECEIVERETBLKID]
+	add r0, r0, CANBUSRECEIVERETBLKDATA
+	ldr r4, [r2, CANBUSRECEIVEADDR]
+	cmp r3, #4
+	ldr r5, [r4], #4
+	str r5, [r0], #4
+	ble poppingend
+morereceivedatapop:
+	ldr r5, [r4]
+	str r5, [r0]
+poppingend:
+	mov r0, #0
+	bx lr
+.size retrieveMessageBlock, .-retrieveMessageBlock
+
+.section .text.canInterruptSetup
+	.type canInterruptSetup, %function
+canInterruptSetup:
+//r0 can base
+//r1 can mask
+
+	add r2, r0, CAN_IER
+	ldr r3, [r2]
+	orr r3, r3, r1
+	str r3, [r2]
+	bx lr
+
+.size canInterruptSetup, .-canInterruptSetup
 
 .section .text.canBUSPeripheralInit
   	.type canBUSPeripheralInit, %function
