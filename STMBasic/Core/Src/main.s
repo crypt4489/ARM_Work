@@ -41,7 +41,7 @@ defined in linker script */
 
  .section .data
 CANSTRING1:
-    .asciz "LKJN"
+    .asciz "BLAHGLAHSLAH"
 CANSTRING2:
     .asciz "UUUU"
 
@@ -508,6 +508,8 @@ LoopFillZerobss:
 
  bl canBUSPeripheralInit
 
+
+
  ldr r0, =CAN1_BASE
 
  bl canBUSInit
@@ -527,10 +529,22 @@ LoopFillZerobss:
 
  pop {r1-r6}
 
+ ldr r0, =CAN1_BASE
+ mov r1, #1
+
+ bl canInterruptSetup
+
+ mov r0, #1
+
+ bl initializeCAN1NVIC
+
+ ldr r0, =CAN1_BASE
+
  bl canExitInit
 
  ldr r0, =_end
  mov r1, #10
+ mov r2, #0
 
  bl canFSMInit
 
@@ -540,7 +554,6 @@ LoopFillZerobss:
 
  bl createTransmitMessageBlk
 
-
  ldr r0, =CAN1_BASE
 
  push {r0}
@@ -549,27 +562,8 @@ LoopFillZerobss:
 
  pop {r0}
 
-
  bl manageReceiveBuffer
 
-
-/*
- mov r1, #0 //mailbox #
- mov r2, #1 //identifier
- mov r3, #4 //datalength
- ldr r4, =CANSTRING1 //address of data
-
- bl canBUSTransmit
-
- ldr r1, =CANSTRING2 //address to write
- movs r2, #-1 // mailbox id
- mov r3, #1
-
- push {r0}
-
- bl canBUSReceive
-
- pop {r0} */
 
 LABEL:
   b LABEL
@@ -814,7 +808,7 @@ g_pfnVectors:
    .thumb_set ADC_IRQHandler,Default_Handler
 
    .weak      CAN1_TX_IRQHandler
-   .thumb_set CAN1_TX_IRQHandler,Default_Handler
+   .thumb_set CAN1_TX_IRQHandler,can1TXInterrupt
 
    .weak      CAN1_RX0_IRQHandler
    .thumb_set CAN1_RX0_IRQHandler,Default_Handler

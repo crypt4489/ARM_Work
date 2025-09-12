@@ -21,6 +21,9 @@
 .global manageTransmitBuffer
 .global manageReceiveBuffer
 .global retrieveMessageBlock
+.global can1TXInterrupt
+.global initializeCAN1NVIC
+.global canInterruptSetup
 
 .equ CANBUSRECEIVEBLKSIZE, 0x10
 .equ CANBUSTRANSMITBLKSIZE, 0x10
@@ -48,7 +51,7 @@
 .equ BYTEBUFFERADDR, 0x00
 .equ BYTEBUFFERCURR, 0x04
 .equ BYTEBUFFERSIZE, 0x08
-.equ BYTEBUFFERCOUNT, 0x10
+.equ BYTEBUFFERCOUNT, 0x0c
 
 .equ TRANSMITBUFFERADDR, 0x00
 .equ TRANSMITBUFFERCURR, 0x04
@@ -95,9 +98,9 @@ ReceiveBufferRead:
 ReceiveBufferCount:
 	.word 0x0
 ByteBuffer:
-	.word 0x00
+	.word 0xFFEECCDD
 ByteBufferPointer:
-	.word 0x00
+	.word 0xAABBCCDD
 ByteBufferSize:
 	.word 0x00
 ByteBufferCount:
@@ -112,7 +115,202 @@ TransmitBufferRead:
 	.word 0xFFFFCCCC
 TransmitBufferCount:
 	.word 0x0
+CAN1OR2:
+	.word 0x0
 
+
+.macro ENABLERXINTERRUPT IntReg1:req, IntReg2:req, IntReg3:req, IntNum:req
+
+	ldr \IntReg1, =CAN1OR2
+	ldr \IntReg1, [\IntReg1]
+	ldr \IntReg2, =NVIC_ISER0
+	cmp \IntReg1, #0
+	ITTE ne
+	movne \IntReg1, #0
+	addne \IntReg2, \IntReg2, #8
+	moveq \IntReg1, #20
+
+	add \IntReg1, \IntReg1, \IntNum //which rx number
+	mov \IntReg3, #1
+	lsl \IntReg1, \IntReg3, \IntReg1
+	ldr \IntReg3, [\IntReg2]
+	orr \IntReg3, \IntReg3, \IntReg1
+	str \IntReg3, [\IntReg2]
+
+.endm
+
+
+.macro DISABLERXINTERRUPT IntReg1:req, IntReg2:req, IntReg3:req, IntNum:req
+
+	ldr \IntReg1, =CAN1OR2
+	ldr \IntReg1, [\IntReg1]
+	ldr \IntReg2, =NVIC_ICER0
+	cmp \IntReg1, #0
+	ITTE ne
+	movne \IntReg1, #0
+	addne \IntReg2, \IntReg2, #8
+	moveq \IntReg1, #20
+	mov \IntReg3, #1
+	lsl \IntReg1, \IntReg3, \IntReg1
+	ldr \IntReg3, =#0
+	orr \IntReg3, \IntReg3, \IntReg1
+	str \IntReg3, [\IntReg2]
+
+.endm
+
+.macro ENABLETXINTERRUPT IntReg1:req, IntReg2:req, IntReg3:req
+
+	ldr \IntReg1, =CAN1OR2
+	ldr \IntReg1, [\IntReg1]
+	ldr \IntReg2, =NVIC_ISER0
+	cmp \IntReg1, #0
+	ITTE ne
+	movtne \IntReg1, #0x8000
+	addne \IntReg2, \IntReg2, #8
+	movteq \IntReg1, #0x0008
+
+	ldr \IntReg3, [\IntReg2]
+	orr \IntReg3, \IntReg3, \IntReg1
+	str \IntReg3, [\IntReg2]
+
+.endm
+
+
+.macro DISABLETXINTERRUPT IntReg1:req, IntReg2:req, IntReg3:req
+
+	ldr \IntReg1, =CAN1OR2
+	ldr \IntReg1, [\IntReg1]
+	ldr \IntReg2, =NVIC_ICER0
+	cmp \IntReg1, #0
+	ITTTE ne
+	movne \IntReg1, #0
+	movtne \IntReg1, #0x8000
+	addne \IntReg2, \IntReg2, #8
+	movteq \IntReg1, #0x0008
+
+	ldr \IntReg3, =0
+	orr \IntReg3, \IntReg3, \IntReg1
+	str \IntReg3, [\IntReg2]
+
+.endm
+
+
+.section .text.initializeCAN1NVIC
+	.type initializeCAN1NVIC, %function
+initializeCAN1NVIC:
+//r0 Interrupt Counter
+	push {r1-r2}
+	ldr r1, =NVIC_ICER0
+	ldr r2, [r1]
+	cmp r0, #0
+	beq endinitializecan1nvic
+	orr r2, r2, #(1 << 19)
+	lsr r0, r0, #1
+	cmp r0, #0
+	beq endinitializecan1nvic
+	orr r2, r2, #(1 << 20)
+	lsr r0, r0, #1
+	cmp r0, #0
+	beq endinitializecan1nvic
+	orr r2, r2, #(1 << 21)
+
+
+endinitializecan1nvic:
+	str r2, [r1]
+	pop {r1-r2}
+	bx lr
+
+.size initializeCAN1NVIC, .-initializeCAN1NVIC
+
+
+.section .text.can1TXInterrupt
+	.type can1TXInterrupt, %function
+can1TXInterrupt:
+
+
+	push {r0-r3}
+	ldr r0, =NVIC_ICPR0
+	ldr r1, =0
+	orr r1, r1, #(0x1 << 19)
+	str r1, [r0]
+	ldr r0, =CAN1_BASE
+	ldr r1, [r0, CAN_TSR]
+	mov r2, #0x0101
+	movt r2, #1
+	orr r1, r1, r2
+	str r1, [r0, CAN_TSR]
+	ldr r2, =TransmitBufferPointer
+	ldr r3, =TransmitBufferRead
+	ldr r2, [r2]
+	ldr r3, [r3]
+	cmp r2, r3
+	beq can1TXIntteruptEnd
+
+	push {r0, lr}
+
+	bl manageTransmitBuffer
+
+	pop { r0, lr }
+
+can1TXIntteruptEnd:
+
+
+	pop {r0-r3}
+	bx lr
+.size can1TXInterrupt, .-can1TXInterrupt
+
+
+.section .text.can1RX0Interrupt
+	.type can1RX0Interrupt, %function
+can1RX0Interrupt:
+
+.size can1RX0Interrupt, .-can1RX0Interrupt
+
+.section .text.can1RX1Interrupt
+	.type can1RX1Interrupt, %function
+can1RX1Interrupt:
+
+.size can1RX1Interrupt, .-can1RX1Interrupt
+
+
+.section .text.can2TXInterrupt
+	.type can2TXInterrupt, %function
+can2TXInterrupt:
+
+	push {r0-r3}
+	ldr r0, =NVIC_ICPR1
+	ldr r1, [r0]
+	bic r1, r1, #(0x1 << 31)
+
+	ldr r2, =TransmitBufferPointer
+	ldr r3, =TransmitBufferRead
+	ldr r2, [r2]
+	ldr r3, [r3]
+	cmp r2, r3
+	beq can2TXIntteruptEnd
+	push {r0-r1, lr}
+	ldr r0, =CAN2_BASE
+	bl manageTransmitBuffer
+	pop {r0-r1, lr}
+can2TXIntteruptEnd:
+	str r1, [r0]
+	pop {r0-r3}
+	bx lr
+
+.size can2TXInterrupt, .-can2TXInterrupt
+
+
+.section .text.can2RX0Interrupt
+	.type can2RX0Interrupt, %function
+can2RX0Interrupt:
+
+.size can2RX0Interrupt, .-can2RX0Interrupt
+
+.section .text.can2RX1Interrupt
+	.type can2RX1Interrupt, %function
+can2RX1Interrupt:
+
+.size can2RX1Interrupt, .-can2RX1Interrupt
 
 
 .section .text.canFSMInit
@@ -120,8 +318,8 @@ TransmitBufferCount:
 canFSMInit:
 // r0 Base Buffer address
 // r1 number of messages to store
-
-	push {r2-r7}
+// r2 can #
+	push {r3-r8}
 	ldr r3, =ReceiveBuffer
 	ldr r4, =ByteBuffer
 	ldr r5, =TransmitBuffer
@@ -131,20 +329,23 @@ canFSMInit:
 	str r0, [r5, TRANSMITBUFFERCURR]
 	str r0, [r5, TRANSMITBUFFERREAD]
 	str r7, [r5, TRANSMITBUFFERSIZE] //init tranmsit
-	add r2, r0, r7
-	str r2, [r3]
-	str r2, [r3, RECEIVEBUFFERCURR]
-	str r2, [r3, RECEIVEBUFFERREAD]
+	add r8, r0, r7
+	str r8, [r3]
+	str r8, [r3, RECEIVEBUFFERCURR]
+	str r8, [r3, RECEIVEBUFFERREAD]
 	mov r6, CANBUSRECEIVEBLKSIZE
 	mul r7, r1, r6 //size of receive buffer
 	str r7, [r3, RECEIVEBUFFERSIZE]
-	add r2, r2, r7
-	str r2, [r4]
-	str r2, [r4, BYTEBUFFERCURR]
+	add r8, r8, r7
+	str r8, [r4]
+	str r8, [r4, BYTEBUFFERCURR]
 	mov r6, #8
 	mul r7, r1, r6 //size of byte buffer
 	str r7, [r4, BYTEBUFFERSIZE]
-	pop {r2-r7}
+
+	ldr r3, =CAN1OR2
+	str r2, [r3]
+	pop {r3-r8}
 	bx lr
 .size canFSMInit, .-canFSMInit
 
@@ -189,7 +390,7 @@ packReceivedMessageInBuffer:
 	bne readmessagrbuffer
 
 	movs r0, #-1
-	bx lr
+	b packreceivefinal
 
 
 readmessagrbuffer:
@@ -199,7 +400,7 @@ readmessagrbuffer:
 	mla r2, r3, r1, r2 //get reception address
 
 	ldr r4, [r4, RECEIVEBUFFERCURR]
-	ldr r5, =ByteBufferPointer
+	ldr r5, =ByteBuffer
 	ldr r5, [r5, BYTEBUFFERCURR]
 	ldr r3, [r2]
 	lsr r3, r3, #21
@@ -250,8 +451,9 @@ packreceiveend:
 	push {r0-r2, lr}
 	bl moveFSMCurrForward
 	pop {r0-r2, lr}
-	pop {r2-r11}
 	mov r0, #0
+packreceivefinal:
+	pop {r2-r11}
 	bx lr
 
 .size packReceivedMessageInBuffer, .-packReceivedMessageInBuffer
@@ -265,6 +467,7 @@ createTransmitMessageBlk:
 //r2 filter
 
 	push {r3-r5}
+	DISABLETXINTERRUPT r3, r4, r5
 	ldr r3, =TransmitBuffer
 	ldr r4, [r3, TRANSMITBUFFERCOUNT]
 	mov r5, CANBUSTRANSMITBLKSIZE
@@ -273,7 +476,7 @@ createTransmitMessageBlk:
 	cmp r4, r5
 	bne nooverflowoftbuffer
 	mov r0, #-1
-	bx lr
+	b endofcreatetransmit
 
 nooverflowoftbuffer:
 	ldr r4, [r3, TRANSMITBUFFERCURR]
@@ -290,8 +493,10 @@ nooverflowoftbuffer:
 	ldr r2, [r3, TRANSMITBUFFERCOUNT]
 	add r2, r2, #1
 	str r2, [r3, TRANSMITBUFFERCOUNT]
-	pop {r3-r4}
 	mov r0, #0
+endofcreatetransmit:
+	ENABLETXINTERRUPT r3, r4, r5
+	pop {r3-r5}
 	bx lr
 
 .size createTransmitMessageBlk, .-createTransmitMessageBlk
@@ -458,7 +663,7 @@ endtmanage:
 manageReceiveBuffer:
 
 // r0 CAN_ADDR
-
+	push {r1-r6}
 	add r1, r0, CAN_RF0R
 	mov r2, #0 //
 	ldr r3, [r1]
@@ -473,7 +678,7 @@ manageReceiveBuffer:
 	bne getmessagesfromrfifo
 
 	movs r0, #-1
-	bx lr
+	b checkrmessagesend
 
 getmessagesfromrfifo:
 	mov r4, r1
@@ -493,6 +698,8 @@ checkrmessagesloop:
 	cmp r2, #0
 	bne rmessagesloop
 	mov r0, #0
+checkrmessagesend:
+	pop {r1-r6}
  	bx lr
 .size manageReceiveBuffer, .-manageReceiveBuffer
 
@@ -501,12 +708,15 @@ checkrmessagesloop:
 	.type retrieveMessageBlock, %function
 retrieveMessageBlock:
 //r0 address to move the structure to
+	push {r1-r5}
+	DISABLERXINTERRUPT r1, r2, r3, #0
+	DISABLERXINTERRUPT r1, r2, r3, #1
 	ldr r1, =ReceiveBufferPointer
 	ldr r2, [r1, RECEIVEBUFFERCOUNT]
 	cmp r2, #0
 	bne proceedwithpoppingrblk
 	movs r0, #-1
-	bx lr
+	b retrieveMessageBlockEnd
 
 proceedwithpoppingrblk:
 	sub r2, r2, #1
@@ -527,6 +737,10 @@ morereceivedatapop:
 	str r5, [r0]
 poppingend:
 	mov r0, #0
+retrieveMessageBlockEnd:
+	ENABLERXINTERRUPT r1, r2, r3, #0
+	ENABLERXINTERRUPT r1, r2, r3, #1
+	pop {r1-r5}
 	bx lr
 .size retrieveMessageBlock, .-retrieveMessageBlock
 
@@ -853,9 +1067,8 @@ byidentifier2:
 	lsr r6, r6, #21
 	cmp r6, r3
 	beq endidentifier
-	pop {r5-r12}
 	mov r0, #-1
-	bx lr
+	b receiveend
 endidentifier:
 	add r5, r0, r4
 
@@ -885,9 +1098,10 @@ bytecopyloop:
 loopcondition:
 	cmp r6, #0
 	bne copydataloop
+	mov r0, #0
 receiveend:
 	pop {r5-r12}
-	mov r0, #0
+
 	bx lr
 
  .size  canBUSReceive, .-canBUSReceive

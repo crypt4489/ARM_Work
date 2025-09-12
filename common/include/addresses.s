@@ -21,7 +21,8 @@
 .equ NVIC_ICPR0, 0xE000E280 //clear pending nvic
 .equ GPIOA_BASE, 0x40020000
 .equ GPIOB_BASE, 0x40020400
-
+.equ NVIC_ICER0, 0xE000E180
+.equ NVIC_ISPR0, 0xE000E200
 //gpio
 
 .equ GPIO_MODER, 0x00
