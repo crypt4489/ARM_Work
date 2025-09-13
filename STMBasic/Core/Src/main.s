@@ -41,7 +41,7 @@ defined in linker script */
 
  .section .data
 CANSTRING1:
-    .asciz "BLAHGLAHSLAH"
+    .asciz "BLAHGLAHSLAHGOSHJUDALOPEPOPE"
 CANSTRING2:
     .asciz "UUUU"
 
@@ -530,11 +530,11 @@ LoopFillZerobss:
  pop {r1-r6}
 
  ldr r0, =CAN1_BASE
- mov r1, #1
+ mov r1, #3
 
  bl canInterruptSetup
 
- mov r0, #1
+ mov r0, #3
 
  bl initializeCAN1NVIC
 
@@ -549,23 +549,20 @@ LoopFillZerobss:
  bl canFSMInit
 
  ldr r0, =CANSTRING1
- mov r1, #12
+ mov r1, #28
  mov r2, #0x1
 
  bl createTransmitMessageBlk
 
  ldr r0, =CAN1_BASE
 
- push {r0}
 
- bl manageTransmitBuffer
-
- pop {r0}
-
- bl manageReceiveBuffer
 
 
 LABEL:
+ // push {r0}
+ // bl manageReceiveBuffer
+ // pop {r0}
   b LABEL
 .size  AllBeginning, .-AllBeginning
 
@@ -811,7 +808,7 @@ g_pfnVectors:
    .thumb_set CAN1_TX_IRQHandler,can1TXInterrupt
 
    .weak      CAN1_RX0_IRQHandler
-   .thumb_set CAN1_RX0_IRQHandler,Default_Handler
+   .thumb_set CAN1_RX0_IRQHandler,can1RX0Interrupt
 
    .weak      CAN1_RX1_IRQHandler
    .thumb_set CAN1_RX1_IRQHandler,Default_Handler

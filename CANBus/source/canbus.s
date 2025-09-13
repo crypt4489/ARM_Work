@@ -20,8 +20,10 @@
 .global copyBlockFSM
 .global manageTransmitBuffer
 .global manageReceiveBuffer
+.global manageReceiveBufferINT
 .global retrieveMessageBlock
 .global can1TXInterrupt
+.global can1RX0Interrupt
 .global initializeCAN1NVIC
 .global canInterruptSetup
 
@@ -200,7 +202,7 @@ CAN1OR2:
 initializeCAN1NVIC:
 //r0 Interrupt Counter
 	push {r1-r2}
-	ldr r1, =NVIC_ICER0
+	ldr r1, =NVIC_ISER0
 	ldr r2, [r1]
 	cmp r0, #0
 	beq endinitializecan1nvic
@@ -230,9 +232,10 @@ can1TXInterrupt:
 
 	push {r0-r3}
 	ldr r0, =NVIC_ICPR0
-	ldr r1, =0
+	ldr r1, [r0]
 	orr r1, r1, #(0x1 << 19)
 	str r1, [r0]
+
 	ldr r0, =CAN1_BASE
 	ldr r1, [r0, CAN_TSR]
 	mov r2, #0x0101
@@ -264,11 +267,57 @@ can1TXIntteruptEnd:
 	.type can1RX0Interrupt, %function
 can1RX0Interrupt:
 
+	push {r0-r3}
+	ldr r0, =NVIC_ICPR0
+	ldr r1, [r0]
+	orr r1, r1, #(0x1 << 20)
+	str r1, [r0]
+
+	ldr r0, =CAN1_BASE
+	ldr r1, =CAN_RF0R
+	mov r2, #0
+
+
+	push { lr }
+
+	bl manageReceiveBufferINT  //pop all messages off fifo queue
+
+	pop { lr }
+
+can1RX0IntteruptEnd:
+
+
+	pop {r0-r3}
+	bx lr
+
 .size can1RX0Interrupt, .-can1RX0Interrupt
 
 .section .text.can1RX1Interrupt
 	.type can1RX1Interrupt, %function
 can1RX1Interrupt:
+
+	push {r0-r3}
+	ldr r0, =NVIC_ICPR0
+	ldr r1, [r0]
+	orr r1, r1, #(0x1 << 21)
+	str r1, [r0]
+
+	ldr r0, =CAN1_BASE
+	ldr r1, =CAN_RF1R
+	mov r2, #0
+
+
+	push { lr }
+
+	bl manageReceiveBufferINT  //pop all messages off fifo queue
+
+	pop { lr }
+
+can1RX1IntteruptEnd:
+
+
+	pop {r0-r3}
+	bx lr
 
 .size can1RX1Interrupt, .-can1RX1Interrupt
 
@@ -381,7 +430,7 @@ packReceivedMessageInBuffer:
 //r1 receive index
 	push {r2-r11}
 
-	ldr r4, =ReceiveBufferPointer //cuurent pointer
+	ldr r4, =ReceiveBuffer //cuurent pointer
 	ldr r2, [r4, RECEIVEBUFFERCOUNT]
 	mov r3, CANBUSRECEIVEBLKSIZE
 	mul r3, r3, r2
@@ -493,7 +542,15 @@ nooverflowoftbuffer:
 	ldr r2, [r3, TRANSMITBUFFERCOUNT]
 	add r2, r2, #1
 	str r2, [r3, TRANSMITBUFFERCOUNT]
+
+	ldr r0, =NVIC_ISPR0
+	ldr r1, [r0]
+	orr r1, r1, #(1 << 19)
+	str r1, [r0]
+
+
 	mov r0, #0
+
 endofcreatetransmit:
 	ENABLETXINTERRUPT r3, r4, r5
 	pop {r3-r5}
@@ -650,7 +707,7 @@ callcopyblocktmanage:
 	push {r0-r1, lr}
 	bl copyBlockFSM
 	pop {r0-r1, lr}
-	mov r0, #0
+	mov r0, r1
 endtmanage:
 	pop {r1-r5}
 	bx lr
@@ -702,6 +759,41 @@ checkrmessagesend:
 	pop {r1-r6}
  	bx lr
 .size manageReceiveBuffer, .-manageReceiveBuffer
+
+
+.section .text.manageReceiveBufferINT
+	.type manageReceiveBufferINT, %function
+manageReceiveBufferINT:
+
+// r0 CAN_ADDR
+// r1 CAN_RF#R
+// r2 RECEIVE INDEX
+	push {r3-r6}
+	add r1, r0, r1
+	ldr r3, [r1]
+	and r3, r3, #3
+
+	mov r4, r1
+	mov r1, r2
+	mov r2, r3
+	movt r5, #0
+	mov r5, #0x0020
+rmessagesloopint:
+	push {r0-r1, lr}
+	bl packReceivedMessageInBuffer
+	pop {r0-r1, lr}
+	ldr r6, [r4]
+	orr r6, r5, r6
+	str r6, [r4]
+
+	sub r2, r2, #1
+	cmp r2, #0
+	bne rmessagesloopint
+	mov r0, #0
+	pop {r3-r6}
+ 	bx lr
+.size manageReceiveBufferINT, .-manageReceiveBufferINT
+
 
 
 .section .text.retrieveMessageBlock
