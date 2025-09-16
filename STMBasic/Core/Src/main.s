@@ -41,7 +41,7 @@ defined in linker script */
 
  .section .data
 CANSTRING1:
-    .asciz "BLAHGLAHSLAHGOSHJUDALOPEPOPE"
+    .asciz "DDAHGLAHSLAHGOSHJUDALOPEPOPECHARLIEKIRKFREDDIE"
 CANSTRING2:
     .asciz "UUUU"
 
@@ -544,20 +544,14 @@ LoopFillZerobss:
 
  ldr r0, =_end
  mov r1, #10
- mov r2, #0
 
- bl canFSMInit
+ bl can1FSMInit
 
  ldr r0, =CANSTRING1
- mov r1, #28
- mov r2, #0x1
+ mov r1, #46
+ mov r2, #1
 
- bl createTransmitMessageBlk
-
- ldr r0, =CAN1_BASE
-
-
-
+ bl createTransmitMessageBlkCAN1
 
 LABEL:
  // push {r0}
