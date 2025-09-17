@@ -554,9 +554,7 @@ LoopFillZerobss:
  bl createTransmitMessageBlkCAN1
 
 LABEL:
- // push {r0}
- // bl manageReceiveBuffer
- // pop {r0}
+
   b LABEL
 .size  AllBeginning, .-AllBeginning
 

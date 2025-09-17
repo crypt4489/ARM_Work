@@ -16,7 +16,7 @@
 .global can2FSMInit
 .global createTransmitMessageBlkCAN1
 .global createTransmitMessageBlkCAN2
-.global manageTransmitBuffer
+.global manageTransmitBufferInt
 .global manageReceiveBuffer
 .global retrieveMessageBlockCAN1
 .global retrieveMessageBlockCAN2
@@ -194,10 +194,12 @@ can1TXInterrupt:
 
 
 	push {r0-r3}
+
 	ldr r0, =NVIC_ICPR0
 	ldr r1, [r0]
 	orr r1, r1, #(0x1 << 19)
 	str r1, [r0]
+
 
 	ldr r0, =CAN1_BASE
 	ldr r1, [r0, CAN_TSR]
@@ -215,7 +217,7 @@ can1TXInterrupt:
 	ldr r1, =CAN1FSM
 	push {r0-r1, lr}
 
-	bl manageTransmitBuffer
+	bl manageTransmitBufferInt
 
 	pop { r0-r1, lr }
 
@@ -232,6 +234,7 @@ can1TXIntteruptEnd:
 can1RX0Interrupt:
 
 	push {r0-r3}
+
 	ldr r0, =NVIC_ICPR0
 	ldr r1, [r0]
 	orr r1, r1, #(0x1 << 20)
@@ -250,7 +253,6 @@ can1RX0Interrupt:
 	pop { lr }
 
 can1RX0IntteruptEnd:
-
 
 	pop {r0-r3}
 	bx lr
@@ -306,7 +308,7 @@ can2TXInterrupt:
 	beq can2TXIntteruptEnd
 	push {r0-r1, lr}
 	ldr r0, =CAN2_BASE
-	bl manageTransmitBuffer
+	bl manageTransmitBufferInt
 	pop {r0-r1, lr}
 can2TXIntteruptEnd:
 	str r1, [r0]
@@ -339,6 +341,10 @@ can2RX1Interrupt:
 initializeCAN1NVIC:
 //r0 Interrupt Counter
 	push {r1-r2}
+
+	ldr r1, =AIRCR
+	ldr r2, =0x05FA0400
+	str r2, [r1]
 	ldr r1, =NVIC_ISER0
 	ldr r2, [r1]
 	cmp r0, #0
@@ -355,6 +361,8 @@ initializeCAN1NVIC:
 
 
 endinitializecan1nvic:
+
+
 	str r2, [r1]
 	pop {r1-r2}
 	bx lr
@@ -433,7 +441,7 @@ clearfsminitloopcan2:
 	adds r3, r3, #4
 	sub r2, r2, #4
 	cmp r2, r4
-	bne clearfsminitloopcan
+	bne clearfsminitloopcan2
 
 
 	ldr r2, =CAN2FSM
@@ -696,9 +704,11 @@ copyBlockFSM:
 	push {r3-r6}
 
 	add r3, r2, CANFSMTRANSMIT
-
+	ldr r4, [r3, TRANSMITBUFFERCURR]
 	ldr r3, [r3, TRANSMITBUFFERREAD]
-
+	mov r6, #-1
+	cmp r3, r4
+	beq readheadtransmove
 	push {r0-r2, lr}
 	mov r2, r3
 	bl copyBlockToCanBUSTransmitter
@@ -734,9 +744,9 @@ readheadtransmove:
 
 
 
-.section .text.manageTransmitBuffer
-	.type manageTransmitBuffer, %function
-manageTransmitBuffer:
+.section .text.manageTransmitBufferInt
+	.type manageTransmitBufferInt, %function
+manageTransmitBufferInt:
 
 // r0 CAN ADDR
 // r1 CANFSMDATA
@@ -749,30 +759,30 @@ manageTransmitBuffer:
 	and r3, r4, r3
 	lsr r3, r3, #26
 	movs r4, #-1
+	ldr r2, [r1]
 	b checktmanageloop
 tmanageloop:
 	adds r4, r4, #1
 	and r5, r3, #1
+	lsr r3, r3, #1
 	cmp r5, #0
 	bne callcopyblocktmanage
-	lsr r3, r3, #1
 checktmanageloop:
 	cmp r3, #0
 	bne tmanageloop
 	movs r0, #-1
 	b endtmanage
 callcopyblocktmanage:
-	ldr r2, [r1]
 	mov r1, r4
 	push {r0-r2, lr}
 	bl copyBlockFSM
 	pop {r0-r2, lr}
 	mov r0, r1
 endtmanage:
-	pop {r1-r5}
+	pop {r2-r6}
 	bx lr
 
-.size manageTransmitBuffer, .-manageTransmitBuffer
+.size manageTransmitBufferInt, .-manageTransmitBufferInt
 
 /* --------------RECEIVER LOGIC------------------------ */
 .section .text.packReceivedMessageInBuffer
@@ -925,25 +935,25 @@ manageReceiveBufferINT:
 // r2 CAN_RF#R
 // r3 CAN_RIOR
 	push {r4-r6}
-
 	ldr r4, [r0, r2]
 	and r4, r4, #3 //get count of number of fifo queued
 
-	add r2, r0, r2
-	add r0, r0, r3
+
 	mov r5, #0x0020
 	movt r5, #0
 	ldr r1, [r1]
 rmessagesloopint:
 	push {r0-r1, lr}
+	add r0, r0, r3
 	bl packReceivedMessageInBuffer
 	pop {r0-r1, lr}
 
-	ldr r6, [r2]
+	ldr r6, [r0, r2]
 	orr r6, r5, r6
-	str r6, [r2]
+	str r6, [r0, r2]
 
-	sub r4, r4, #1
+	ldr r4, [r0, r2]
+	and r4, r4, #3
 	cmp r4, #0
 	bne rmessagesloopint
 	mov r0, #0
