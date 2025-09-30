@@ -42,9 +42,12 @@ defined in linker script */
  .section .data
 CANSTRING1:
     .asciz "DDAHGLAHSLAHGOSHJUDALOPEPOPECHARLIEKIRKFREDDIE"
+CANSTRING3:
+	.asciz "WHATGWATJUSTLUSTMUSTCUSPGUFFHUMPHMOPPWESSCANI"
 CANSTRING2:
     .asciz "UUUU"
 
+Buffer: .space 16
 
     .section  .text.TIM9_Handler
 TIM9_Handler:
@@ -508,8 +511,6 @@ LoopFillZerobss:
 
  bl canBUSPeripheralInit
 
-
-
  ldr r0, =CAN1_BASE
 
  bl canBUSInit
@@ -523,7 +524,7 @@ LoopFillZerobss:
 
  push {r1-r6}
 
- mov r1, sp
+ mov r0, sp
 
  bl canFilterSet
 
@@ -539,21 +540,34 @@ LoopFillZerobss:
  bl initializeCAN1NVIC
 
  ldr r0, =CAN1_BASE
+ ldr r1, =0
 
  bl canExitInit
 
  ldr r0, =_end
- mov r1, #10
+ mov r1, #9
 
  bl can1FSMInit
 
  ldr r0, =CANSTRING1
- mov r1, #46
+ mov r1, #88
  mov r2, #1
 
  bl createTransmitMessageBlkCAN1
 
 LABEL:
+
+  bl can1PumpMessages
+
+  mov r0, #0xFFFF
+  movt r0, #0x0000
+L_INNER:
+  subs r0, r0, #1
+  cmp r0, #0
+  bge L_INNER
+
+  ldr r0, =Buffer
+  bl retrieveMessageBlockCAN1
 
   b LABEL
 .size  AllBeginning, .-AllBeginning
@@ -926,13 +940,13 @@ g_pfnVectors:
    .thumb_set DMA2_Stream4_IRQHandler,Default_Handler
 
    .weak      CAN2_TX_IRQHandler
-   .thumb_set CAN2_TX_IRQHandler,Default_Handler
+   .thumb_set CAN2_TX_IRQHandler,can2TXInterrupt
 
    .weak      CAN2_RX0_IRQHandler
-   .thumb_set CAN2_RX0_IRQHandler,Default_Handler
+   .thumb_set CAN2_RX0_IRQHandler,can2RX0Interrupt
 
    .weak      CAN2_RX1_IRQHandler
-   .thumb_set CAN2_RX1_IRQHandler,Default_Handler
+   .thumb_set CAN2_RX1_IRQHandler,can2RX1Interrupt
 
    .weak      CAN2_SCE_IRQHandler
    .thumb_set CAN2_SCE_IRQHandler,Default_Handler

@@ -1,3 +1,10 @@
 Drivers/
 Debug/
 *.ioc
+*/CMakeFiles/
+*/CMakeCache.txt
+TIM_PWMInput/
+GPIO_IOTOGGLE/
+.metadata/
+*/.settings/
+*/.vscode/
