@@ -1,0 +1,23 @@
+
+
+
+.equ SPI1, 0x40013000
+.equ SPI2, 0x40003800
+.equ SPI3, 0x40003C00
+.equ SPI4, 0x40013400
+
+.equ I2S1, 0x40013000
+.equ I2S2, 0x40003800
+.equ I2S3, 0x40003C00
+
+
+
+.equ SPI_CR1, 0x00
+.equ SPI_CR2, 0x04
+.equ SPI_SR, 0x08
+.equ SPI_DR, 0x0C
+.equ SPI_CRCPR, 0x10
+.equ SPI_RXCRCR, 0x14
+.equ SPI_TXCRCR, 0x18
+.equ SPI_I2SCFGR, 0x1C
+.equ SPI_I2SPR, 0x20

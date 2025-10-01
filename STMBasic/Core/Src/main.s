@@ -506,7 +506,7 @@ LoopFillZerobss:
  str r1, [r0, SCB_CPACR]
 
  bl EstablishClockSignal
-
+/*
  ldr r0, =0
 
  bl canBUSPeripheralInit
@@ -569,7 +569,27 @@ L_INNER:
   ldr r0, =Buffer
   bl retrieveMessageBlockCAN1
 
+  b LABEL  */
+
+  ldr r0, =7
+  ldr r1, =0
+  ldr r2, =0
+  ldr r3, =2
+  ldr r4, =1
+  ldr r5, =2
+
+  push {r0-r5}
+
+  mov r0, sp
+
+  bl spi1Init
+
+  pop {r0-r5}
+
+LABEL:
+
   b LABEL
+
 .size  AllBeginning, .-AllBeginning
 
 /**
