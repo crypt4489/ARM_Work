@@ -21,6 +21,7 @@
 
 .include "addresses.s"
 .include "canbus_addresses.s"
+.include "spi_addresses.s"
 
 .global  g_pfnVectors
 .global  Default_Handler
@@ -41,11 +42,13 @@ defined in linker script */
 
  .section .data
 CANSTRING1:
-    .asciz "DDAHGLAHSLAHGOSHJUDALOPEPOPECHARLIEKIRKFREDDIE"
+    .asciz "OOOOGLAHSLAHGOSHJUDALOPEPOPECHARLIEKIRKFREDDIE"
 CANSTRING3:
 	.asciz "WHATGWATJUSTLUSTMUSTCUSPGUFFHUMPHMOPPWESSCANI"
 CANSTRING2:
     .asciz "UUUU"
+SPIWHAT:
+	.word 0x77777777
 
 Buffer: .space 16
 
@@ -571,21 +574,42 @@ L_INNER:
 
   b LABEL  */
 
+  bl spi1SetupDMAStreams
+
   ldr r0, =7
-  ldr r1, =0
+  ldr r1, =1
   ldr r2, =0
   ldr r3, =2
   ldr r4, =1
   ldr r5, =2
+  ldr r6, =3
+  ldr r7, =3
 
-  push {r0-r5}
+  push {r0-r7}
 
   mov r0, sp
 
   bl spi1Init
 
-  pop {r0-r5}
+  pop {r0-r7}
 
+
+  ldr r0, =CANSTRING3
+  mov r1, #4
+
+  bl spi1StartDMAReception
+
+  ldr r0, =CANSTRING1
+  mov r1, #0x4
+
+  bl spi1StartDMATransfer
+/*
+  ldr r0, =SPI1
+  mov r1, #0xF
+
+
+  bl spiImmediateCopy
+*/
 LABEL:
 
   b LABEL

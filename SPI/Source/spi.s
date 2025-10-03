@@ -8,9 +8,28 @@
 
 
 .global spi1Init
+.global spiImmediateCopy
+.global spi1SetupDMAStreams
+.global spi1StartDMATransfer
+.global spi1StartDMAReception
+
 
 
 /*
+
+struct FSM
+{
+	u32 TransmitBufferAddr
+	u32 TrasnmitBufferRead
+	u32 TransmitBufferCurr
+	u32 TransmitBufferSize
+	u32 ReceiveBufferAddr
+	u32 ReceiveBufferCurr
+	u32 ReceiveBufferRead
+	u32 ReceiveBufferSize
+	u32 ReceiveBufferCount
+};
+
 
 
 NSS output enable (SSM=0,SSOE = 1): this configuration is only used when the
@@ -27,6 +46,88 @@ standard “chip select” input and the slave is selected while NSS line is at 
 */
 
 
+.section .text.spiGlobalInterrupt
+	.type spiGlobalInterrupt, %function
+spiGlobalInterrupt:
+
+
+.size spiGlobalInterrupt, .-spiGlobalInterrupt
+
+
+.section .text.spi1SetupDMAStreams
+	.type spi1SetupDMAStreams, %function
+spi1SetupDMAStreams:
+
+ push {r0-r1}
+ ldr r0, =RCC_AHB1ENR       //gpioa enable clock peripheral
+ ldr r1, [r0]
+ orr r1, r1, #(0b1 << 22) // enabled DMA2 controller (only one for memory to memory)
+ str r1, [r0]
+ pop {r0-r1}
+ bx lr
+
+.size spi1SetupDMAStreams, .-spi1SetupDMAStreams
+
+
+.section .text.spi1StartDMATransfer
+	.type spi1StartDMATransfer, %function
+spi1StartDMATransfer:
+
+//r0 ADDRESS OF DATA
+//r1 SIZE OF DATA
+ push {r2-r3}
+ ldr r2, =DMA2_BASE  // load dma2 base
+ ldr r3, =SPI1
+ add r3, r3, SPI_DR
+ str r3, [r2, DMA_S3PAR] // dma write is SPI address
+ str r0, [r2, DMA_S3M0AR] //dma read is ADDRESS OF DATA
+
+ str r1, [r2, DMA_S3NDTR] // number of n-bytes to write
+ mov r3, #0x0440 // auto increment read address and keep fixed write address, mem-to-per
+ movt r3, #0x0600 //dma channel 3
+ str r3, [r2, DMA_S3CR] //configure dma transfer
+ ldr r3, [r2, DMA_S3FCR]
+ orr r3, r3, #(0b11)
+ str r3, [r2, DMA_S3FCR] //full fifo
+ ldr r3, [r2, DMA_S3CR]
+ orr r3, r3, #1
+ str r3, [r2, DMA_S3CR] //start dma transfer
+ pop {r2-r3}
+ bx lr
+
+.size spi1StartDMATransfer, .-spi1StartDMATransfer
+
+
+.section .text.spi1StartDMAReception
+	.type spi1StartDMAReception, %function
+spi1StartDMAReception:
+
+
+//r0 ADDRESS OF DATA
+//r1 SIZE OF DATA
+ push {r2-r3}
+ ldr r2, =DMA2_BASE  // load dma2 base
+ ldr r3, =SPI1
+ add r3, r3, SPI_DR
+ str r3, [r2, DMA_S0PAR] // dma write is SPI address
+ str r0, [r2, DMA_S0M0AR] //dma read is ADDRESS OF DATA
+
+ str r1, [r2, DMA_S0NDTR] // number of n-bytes to write
+ mov r3, #0x0400 // auto increment read address and keep fixed write address, per-to-mem
+ movt r3, #0x0600 //dma channel 3
+ str r3, [r2, DMA_S0CR] //configure dma transfer
+ ldr r3, [r2, DMA_S0FCR]
+ orr r3, r3, #(0b11)
+ str r3, [r2, DMA_S0FCR] //full fifo
+ ldr r3, [r2, DMA_S0CR]
+ orr r3, r3, #1
+ str r3, [r2, DMA_S0CR] //start dma transfer
+ pop {r2-r3}
+ bx lr
+.size spi1StartDMAReception, .-spi1StartDMAReception
+
+
+
 //
 
 //this will be used as master of bus but with
@@ -41,23 +142,17 @@ PA7 - SPI_MOSI */
 
 //IN : r0 address to data structure
 
-//r0 baudrate
-//r1 lsb/msb frame format
-//r2 data frame format
-//r3 ssm and ssoe
-//r4 master/slave selection
-//r5 CPOL/CPHA, what value it is when low/which clock part is used when transmitting
-
+//r1 baudrate
+//r2 lsb/msb frame format
+//r3 data frame format
+//r4 ssm and ssoe
+//r5 master/slave selection
+//r6 CPOL/CPHA, what value it is when low/which clock part is used when transmitting
+//r7 DMA TX and RX
 spi1Init:
 
-	push {r7-r9}
+	push {r1-r10}
 
-	ldr r5, [r0, #20]
-	ldr r4, [r0, #16]
-	ldr r3, [r0, #12]
-	ldr r2, [r0, #8]
-	ldr r1, [r0, #4]
-	ldr r0, [r0]
 
 
 	ldr r7, =RCC_AHB1ENR
@@ -70,63 +165,94 @@ spi1Init:
 	orr r8, r8, #(1 << 12)
 	str r8, [r7] //enable spi1
 
-	ldr r7, =GPIOA_BASE
-	ldr r8, [r7, GPIO_MODER]
-	orr r8, r8, #(0xAA << 8)
-	str r8, [r7, GPIO_MODER] //alternate fucntion mode
+	ldr r7, [r0, #24]
+	ldr r6, [r0, #20]
+	ldr r5, [r0, #16]
+	ldr r4, [r0, #12]
+	ldr r3, [r0, #8]
+	ldr r2, [r0, #4]
+	ldr r1, [r0]
 
-	ldr r8, [r7, GPIO_OSPEEDR]
-	orr r8, r8, #(0xAA << 8)
-	str r8, [r7, GPIO_OSPEEDR] //fast speed
 
-	ldr r8, [r7, GPIO_PUPDR]
-	orr r8, r8, #(0xAA << 8)
-	str r8, [r7, GPIO_PUPDR] //pull down resistor
+	ldr r8, =GPIOA_BASE
+	ldr r9, [r8, GPIO_MODER]
+	orr r9, r9, #(0xAA << 8)
+	str r9, [r8, GPIO_MODER] //alternate fucntion mode
+
+	ldr r9, [r8, GPIO_OSPEEDR]
+	orr r9, r9, #(0xAA << 8)
+	str r9, [r8, GPIO_OSPEEDR] //fast speed
+
+	ldr r9, [r8, GPIO_PUPDR]
+	orr r9, r9, #(0xAA << 8)
+	str r9, [r8, GPIO_PUPDR] //pull down resistor
 
 	mov r9, #0x5555
 	lsl r9, r9, #16
-	ldr r8, [r7, GPIO_AFRL]
-	orr r8, r8, r9
-	str r8, [r7, GPIO_AFRL] //set alternate function as 5 for SPI
+	ldr r10, [r8, GPIO_AFRL]
+	orr r9, r10, r9
+	str r9, [r8, GPIO_AFRL] //set alternate function as 5 for SPI
 
 
-	ldr r7, =SPI1
+	ldr r8, =SPI1
 	ldr r9, =0
 
-	orr r9, r9, r2
+	orr r9, r9, r3
 	lsl r9, r9, #11 //data frame
-	and r10, r3, #1
+	and r10, r4, #1
 	lsl r10, r10, #9
 	orr r9, r9, r10 //ssm
-	and r10, r1, #1
+	and r10, r2, #1
 	lsl r10, r10, #7
 	orr r9, r9, r10 //lsb/msb
-	and r10, r0, #7
+	and r10, r1, #7
 	lsl r10, r10, #3
 	orr r9, r9, r10 //baud rate
-	and r10, r4, #1
+	and r10, r5, #1
 	lsl r10, r10, #2
 	orr r9, r9, r10 //master or slave
-	and r10, r5, #3
+	and r10, r6, #3
 	orr r9, r9, r10 // CPOL/CPHA
 	orr r9, r9, #(1 << 6) //enable
+	ldr r1, [r0, #28]
+	and r1, r1, #3
+	lsl r1, r1, #14
+	orr r9, r9, r1
 
+	and r10, r4, #2
+	lsl r10, r10, #1
+	orr r10, r10, r7
 
-	and r8, r3, #2
-	lsl r8, r8, #1
-	str r8, [r7, SPI_CR2]
+	str r10, [r8, SPI_CR2]
 
-	str r9, [r7, SPI_CR1]
+	str r9, [r8, SPI_CR1]
 
-	mov r9, #0xC3
-
-	str r9, [r7, SPI_DR]
-
-	ldr r7, [r7, SPI_DR]
-
-	pop {r7-r9}
+	pop {r1-r10}
 
 	bx lr
 
 .size spi1Init, .-spi1Init
+
+
+.section .text.spiImmediateCopy
+	.type spiImmediateCopy, %function
+spiImmediateCopy:
+//r0 SPI ADDR
+//r1 DATA
+
+	push {r2}
+
+L_SPICOPYLOOP:
+	ldr r2, [r0, SPI_SR]
+	and r2, r2, #2
+	cmp r2, #0
+	beq L_SPICOPYLOOP
+
+	str r1, [r0, SPI_DR]
+
+	pop {r2}
+	bx lr
+
+.size spiImmediateCopy, .-spiImmediateCopy
+
 
