@@ -8,7 +8,7 @@
 .cpu cortex-m4
 .thumb
 
-
+/*
 .include "addresses.s"
 
 
@@ -555,3 +555,4 @@ updateandout:
 
   bx lr
 .size USARTBitBangingInt, .-USARTBitBangingInt
+*/

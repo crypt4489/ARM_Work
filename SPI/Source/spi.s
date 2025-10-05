@@ -149,6 +149,7 @@ PA7 - SPI_MOSI */
 //r5 master/slave selection
 //r6 CPOL/CPHA, what value it is when low/which clock part is used when transmitting
 //r7 DMA TX and RX
+//r8 DMA BIMODE and associated
 spi1Init:
 
 	push {r1-r10}
@@ -176,20 +177,26 @@ spi1Init:
 
 	ldr r8, =GPIOA_BASE
 	ldr r9, [r8, GPIO_MODER]
+	bic r9, r9, #(0xFF << 8)
 	orr r9, r9, #(0xAA << 8)
 	str r9, [r8, GPIO_MODER] //alternate fucntion mode
 
 	ldr r9, [r8, GPIO_OSPEEDR]
+	bic r9, r9, #(0xFF << 8)
 	orr r9, r9, #(0xAA << 8)
 	str r9, [r8, GPIO_OSPEEDR] //fast speed
 
 	ldr r9, [r8, GPIO_PUPDR]
+	bic r9, r9, #(0xFF << 8)
 	orr r9, r9, #(0xAA << 8)
 	str r9, [r8, GPIO_PUPDR] //pull down resistor
 
-	mov r9, #0x5555
+	mov r9, #0xFFFF
 	lsl r9, r9, #16
 	ldr r10, [r8, GPIO_AFRL]
+	bic r10, r10, r9
+	mov r9, #0x5555
+	lsl r9, r9, #16
 	orr r9, r10, r9
 	str r9, [r8, GPIO_AFRL] //set alternate function as 5 for SPI
 

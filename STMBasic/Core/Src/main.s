@@ -42,7 +42,7 @@ defined in linker script */
 
  .section .data
 CANSTRING1:
-    .asciz "OOOOGLAHSLAHGOSHJUDALOPEPOPECHARLIEKIRKFREDDIE"
+    .asciz "EEEEELAHSLAHGOSHJUDALOPEPOPECHARLIEKIRKFREDDIE"
 CANSTRING3:
 	.asciz "WHATGWATJUSTLUSTMUSTCUSPGUFFHUMPHMOPPWESSCANI"
 CANSTRING2:
@@ -51,7 +51,7 @@ SPIWHAT:
 	.word 0x77777777
 
 Buffer: .space 16
-
+/*
     .section  .text.TIM9_Handler
 TIM9_Handler:
 	PUSH {r0-r1, lr}
@@ -456,7 +456,7 @@ PA11TEST:
  // str r1, [r0, #0x24]
 
  	.size PA11TEST, .-PA11TEST
-
+**/
 /**
  * @brief  This is the code that gets called when the processor first
  *          starts execution following a reset event. Only the absolutely
@@ -574,16 +574,18 @@ L_INNER:
 
   b LABEL  */
 
+  bl InitializeUSART2
+
   bl spi1SetupDMAStreams
 
-  ldr r0, =7
-  ldr r1, =1
+  ldr r0, =6
+  ldr r1, =0
   ldr r2, =0
-  ldr r3, =2
-  ldr r4, =1
-  ldr r5, =2
+  ldr r3, =0
+  ldr r4, =0
+  ldr r5, =0
   ldr r6, =3
-  ldr r7, =3
+  ldr r7, =0
 
   push {r0-r7}
 
@@ -594,15 +596,22 @@ L_INNER:
   pop {r0-r7}
 
 
-  ldr r0, =CANSTRING3
-  mov r1, #4
+ // ldr r0, =CANSTRING3
+ // mov r1, #12
+
+ // bl spi1StartDMAReception
+
+  ldr r0, =CANSTRING1
+  mov r1, #10
 
   bl spi1StartDMAReception
 
-  ldr r0, =CANSTRING1
-  mov r1, #0x4
 
-  bl spi1StartDMATransfer
+
+
+
+
+
 /*
   ldr r0, =SPI1
   mov r1, #0xF
@@ -610,9 +619,25 @@ L_INNER:
 
   bl spiImmediateCopy
 */
-LABEL:
 
-  b LABEL
+ // ldr r0, =CANSTRING1
+//  mov r1, #0x04
+
+ // bl spi1StartDMATransfer
+
+  ldr r0, =USART2_BASE
+  ldr r2, =CANSTRING1
+  add r3, r2, #10
+  #mov r1, #79
+LABEL:
+  ldrb r1, [r2]
+
+  bl WriteToUSART
+  add r2, r2, #1
+  cmp r2, r3
+  bne LABEL
+L_002:
+  b L_002
 
 .size  AllBeginning, .-AllBeginning
 
@@ -869,11 +894,9 @@ g_pfnVectors:
    .weak      EXTI9_5_IRQHandler
    .thumb_set EXTI9_5_IRQHandler,Default_Handler
 
-   /*.weak      TIM1_BRK_TIM9_IRQHandler
-   .thumb_set TIM1_BRK_TIM9_IRQHandler,Default_Handler*/
-
    .weak      TIM1_BRK_TIM9_IRQHandler
-   .thumb_set TIM1_BRK_TIM9_IRQHandler,TIM9_Handler
+   .thumb_set TIM1_BRK_TIM9_IRQHandler,Default_Handler
+
 
    .weak      TIM1_UP_TIM10_IRQHandler
    .thumb_set TIM1_UP_TIM10_IRQHandler,Default_Handler
@@ -891,7 +914,7 @@ g_pfnVectors:
    .thumb_set TIM3_IRQHandler,Default_Handler
 
    .weak      TIM4_IRQHandler
-   .thumb_set TIM4_IRQHandler,USARTBitBangingInt
+   .thumb_set TIM4_IRQHandler,Default_Handler
 
    .weak      I2C1_EV_IRQHandler
    .thumb_set I2C1_EV_IRQHandler,Default_Handler
