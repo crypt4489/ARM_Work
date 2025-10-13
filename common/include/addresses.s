@@ -156,6 +156,14 @@
 .equ DMA_S7M1AR, 0xc8
 .equ DMA_S7FCR, 0xcc
 
+.equ DMA_CR, 0x00
+.equ DMA_NDTR, 0x04
+.equ DMA_PAR, 0x08
+.equ DMA_M0AR, 0x0c
+.equ DMA_M1AR, 0x10
+.equ DMA_FCR, 0x14
+
+
  .equ USART1_BASE, 0x40011000
  .equ USART2_BASE, 0x40004400
  .equ USART3_BASE, 0x40004800

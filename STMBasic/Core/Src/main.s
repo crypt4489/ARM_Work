@@ -457,6 +457,32 @@ PA11TEST:
 
  	.size PA11TEST, .-PA11TEST
 **/
+
+ .section  .text.GPIOSetup
+
+  .type  GPIOSetup, %function
+GPIOSetup:
+  ldr r0, =GPIOA_BASE
+  ldr r1, [r0, GPIO_MODER]
+  bic r1, r1, #(0b11 << (2 * 9))   // Clear PA11
+  orr r1, r1, #(0b01 << (2 * 9))   // Set PA3 togpio
+  str r1, [r0, GPIO_MODER]
+
+   ldr r1, [r0, GPIO_OSPEEDR]
+  bic r1, r1, #(0b11 << (2 * 9))   // Clear PA3
+  orr r1, r1, #(0b10 << (2 * 9))   // Set to high speed
+  str r1, [r0, GPIO_OSPEEDR]
+
+  ldr r1, [r0, GPIO_PUPDR]
+  bic r1, r1, #(0b11 << (2 * 9))   // Clear PA11
+  orr r1, r1, #(0b01 << (2 * 9))   // Set to pull up
+  str r1, [r0, GPIO_PUPDR]
+
+  ldr r1, =#(1 << 9)
+  str r1, [r0, GPIO_BSRR]
+
+.size  GPIOSetup, .-GPIOSetup
+
 /**
  * @brief  This is the code that gets called when the processor first
  *          starts execution following a reset event. Only the absolutely
@@ -573,8 +599,24 @@ L_INNER:
   bl retrieveMessageBlockCAN1
 
   b LABEL  */
+  bl InitializeDMA1
+
+
+  ldr r1, =0
+  ldr r2, =#0x124f
+  ldr r3, =#3
+  ldr r4, =#2
+  ldr r5, =#0
+
+  push {r1-r5}
+
+  mov r0, sp
 
   bl InitializeUSART2
+
+  pop {r1-r5}
+
+  bl GPIOSetup
 
   bl spi1SetupDMAStreams
 
@@ -624,20 +666,23 @@ L_INNER:
 //  mov r1, #0x04
 
  // bl spi1StartDMATransfer
+ ldr r1, =DMA1_BASE
+ ldr r2, =DMA_S6CR
+ ldr r3, =USART2_BASE
 
-  ldr r0, =USART2_BASE
-  ldr r2, =CANSTRING1
-  add r3, r2, #10
-  #mov r1, #79
+ push {r1-r3}
+
+ mov r0, sp
+
 LABEL:
-  ldrb r1, [r2]
+  ldr r1, =CANSTRING1
+  mov r2, #16
 
-  bl WriteToUSART
-  add r2, r2, #1
-  cmp r2, r3
-  bne LABEL
-L_002:
-  b L_002
+
+
+  bl WriteToUSARTDMA
+
+  b LABEL
 
 .size  AllBeginning, .-AllBeginning
 
