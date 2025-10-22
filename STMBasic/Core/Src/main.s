@@ -480,6 +480,7 @@ GPIOSetup:
 
   ldr r1, =#(1 << 9)
   str r1, [r0, GPIO_BSRR]
+  bx lr
 
 .size  GPIOSetup, .-GPIOSetup
 
