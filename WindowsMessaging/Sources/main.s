@@ -158,9 +158,9 @@ pop {lr}
 
  // bl spi1StartDMAReception
 
-  ldr r0, =GPIOA_BASE
-  ldr r1, =#(1 << 9)
-  str r1, [r0, GPIO_BSRR]
+  //ldr r0, =GPIOA_BASE
+  //ldr r1, =#(1 << 9)
+  //str r1, [r0, GPIO_BSRR]
 
 
   sub sp, sp, #4

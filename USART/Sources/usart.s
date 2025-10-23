@@ -137,6 +137,9 @@ ldr r3, [r0]
 ldr r4, [r0, #4]
 ldr r5, [r0, #8]
 
+ ldr r6, [r3, DMA_HISR]
+ str r6, [r3, DMA_HIFCR]
+
 L_002:
  ldr r6, [r5, USART_SR]
  and r6, r6, #0x80
@@ -167,11 +170,19 @@ L_003:
  cmp r5, #0
  bne L_003
 
- ldr r3, [r0]
- ldr r4, [r3, DMA_HISR]
- and r4, r4, #(0x3F << 16)
- str r4, [r3, DMA_HIFCR]
+ldr r3, [r0, #8]
 
+L_004:
+ldr r4, [r3, USART_SR]
+and r5, r4, #(0x40)
+cmp r5, #0
+beq L_004
+bic r4, r4, #(0x40)
+str r4, [r3, USART_SR]
+
+ldr r3, [r0]
+ ldr r6, [r3, DMA_HISR]
+ str r6, [r3, DMA_HIFCR]
 
 pop {r3-r6}
 bx lr
