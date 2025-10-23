@@ -10,6 +10,14 @@
 .global WriteToUSARTDMA
 
 
+
+ .section  .text.CalculateBRR
+ .type CalculateBRR, %function
+CalculateBRR:
+
+
+ .size  CalculateBRR, .-CalculateBRR
+
  .section  .text.InitializeDMA1
  .type InitializeDMA1, %function
  InitializeDMA1:
@@ -83,14 +91,8 @@
 
  ldr r4, [r0, #4]
 
- //mov r1, #0x124f
  str r4, [r1, USART_BRR] // set baud rate of 9600
 
- ldr r3, [r0, #12]
- lsl r3, r3, #6
- ldr r2, [r1, USART_CR3]
- orr r2, r2, r3
- str r2, [r1, USART_CR3]
 
  ldr r2, [r1, USART_CR1]
 
@@ -137,8 +139,8 @@ ldr r3, [r0]
 ldr r4, [r0, #4]
 ldr r5, [r0, #8]
 
- ldr r6, [r3, DMA_HISR]
- str r6, [r3, DMA_HIFCR]
+ //ldr r6, [r3, DMA_HISR]
+// str r6, [r3, DMA_HIFCR]
 
 L_002:
  ldr r6, [r5, USART_SR]
@@ -158,11 +160,17 @@ add r4, r4, r3
  str r5, [r4, DMA_CR] //configure dma transfer
  ldr r5, [r4, DMA_FCR]
  bic r5, r5, #(0b100)
- orr r5, r5, #(0b101)
+ orr r5, r5, #(0b011)
  str r5, [r4, DMA_FCR]
  ldr r5, [r4, DMA_CR]
  orr r5, r5, #1
  str r5, [r4, DMA_CR] //start dma transfer
+
+ ldr r3, [r0, #8]
+ mov r5, #0x80
+ ldr r6, [r3, USART_CR3]
+ orr r6, r6, r5
+ str r6, [r3, USART_CR3]
 
 L_003:
  ldr r5, [r4, DMA_CR]
@@ -170,19 +178,23 @@ L_003:
  cmp r5, #0
  bne L_003
 
-ldr r3, [r0, #8]
-
 L_004:
 ldr r4, [r3, USART_SR]
 and r5, r4, #(0x40)
 cmp r5, #0
 beq L_004
+
 bic r4, r4, #(0x40)
 str r4, [r3, USART_SR]
 
-ldr r3, [r0]
- ldr r6, [r3, DMA_HISR]
- str r6, [r3, DMA_HIFCR]
+ldr r4, [r3, USART_CR3]
+bic r4, r4, #0x80
+str r4, [r3, USART_CR3]
+
+ldr r5, [r0]
+ ldr r6, [r5, DMA_HISR]
+ str r6, [r5, DMA_HIFCR]
+
 
 pop {r3-r6}
 bx lr

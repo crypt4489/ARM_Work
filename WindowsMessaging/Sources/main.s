@@ -118,7 +118,7 @@ main:
 pop {lr}
 
   ldr r1, =0
-  ldr r2, =#0x124f
+  ldr r2, =#0x0030
   ldr r3, =#3
   ldr r4, =#2
   ldr r5, =#0
@@ -179,6 +179,7 @@ L_004:
   cmp r1, #0
   beq L_004
 
+  orr r1, r1, #0x10
   str r1, [r0, DMA_LIFCR]
 
   ldr r0, =STRING
@@ -201,6 +202,7 @@ L_006:
   cmp r1, #0
   beq L_006
 
+  orr r1, r1, #0x10
   str r1, [r0, DMA_LIFCR]
 
   ldr r1, =DMA1_BASE
