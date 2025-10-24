@@ -16,6 +16,34 @@
 CalculateBRR:
 
 
+// ret MANTISSA/DIVISOR
+//r0 System Clock
+//r1 Requested Baud Rate
+//r2 oversampling bool
+
+
+push {r3-r6}
+mov r3, #2
+lsl r4, r1, #3
+sub r3, r3, r2
+mul r4, r4, r3
+udiv r3, r0, r4
+mul r5, r3, r4
+sub r5, r0, r5
+cmp r2, #0
+ITE eq
+moveq r6, #4
+movne r6, #3
+L_BRREND:
+lsl r5, r5, r6
+lsl r6, r6, #1
+lsl r4, r4, r6
+udiv r6, r5, r4
+lsl r3, r3, #4
+orr r0, r3, r6
+pop {r3-r6}
+bx lr
+
  .size  CalculateBRR, .-CalculateBRR
 
  .section  .text.InitializeDMA1
@@ -38,7 +66,7 @@ CalculateBRR:
 //r0 data format /0
 //r1 baud rate /4
 //r2 tx/rx enable /8
-//r3 tx/rx dma /12
+//r3 sysetm clock /12
 //r4 parity selection /16
  InitializeUSART2:
 
@@ -89,7 +117,18 @@ CalculateBRR:
  orr r4, r5, r4
  str r4, [r1, USART_CR1]
 
- ldr r4, [r0, #4]
+
+ push {r0-r2, lr}
+
+ ldr r1, [r0, #4]
+ ldr r0, [r0, #12]
+ mov r2, #0
+
+ bl CalculateBRR
+
+ mov r4, r0
+
+ pop {r0-r2, lr}
 
  str r4, [r1, USART_BRR] // set baud rate of 9600
 
@@ -167,9 +206,8 @@ add r4, r4, r3
  str r5, [r4, DMA_CR] //start dma transfer
 
  ldr r3, [r0, #8]
- mov r5, #0x80
  ldr r6, [r3, USART_CR3]
- orr r6, r6, r5
+ orr r6, r6, #0x80
  str r6, [r3, USART_CR3]
 
 L_003:

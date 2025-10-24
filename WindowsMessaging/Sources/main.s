@@ -118,9 +118,9 @@ main:
 pop {lr}
 
   ldr r1, =0
-  ldr r2, =#0x0030
+  ldr r2, =#9600
   ldr r3, =#3
-  ldr r4, =#2
+  ldr r4, =#45000000
   ldr r5, =#0
 
   push {r1-r5}
@@ -152,15 +152,6 @@ pop {lr}
 
   pop {r0-r7}
 
-
- // ldr r0, =CANSTRING3
- // mov r1, #12
-
- // bl spi1StartDMAReception
-
-  //ldr r0, =GPIOA_BASE
-  //ldr r1, =#(1 << 9)
-  //str r1, [r0, GPIO_BSRR]
 
 
   sub sp, sp, #4
