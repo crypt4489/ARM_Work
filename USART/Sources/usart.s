@@ -7,7 +7,7 @@
 .global InitializeDMA1
 .global InitializeUSART2
 .global WriteToUSART
-.global WriteToUSARTDMA
+.global WriteToUSART2DMA
 
 
 
@@ -164,19 +164,19 @@ L_001:
  .type WriteToUSARTDMA, %function
   WriteToUSARTDMA:
 /*
-//r0 addresses
+//r2 addresses
 --//r0 DMA BASE
 --//r1 DMA Stream Offset
 --//r2 USART BASE
-//r1 address of data
-//r2 size of data
+//r0 address of data
+//r1 size of data
 */
 
 push {r3-r6}
 
-ldr r3, [r0]
-ldr r4, [r0, #4]
-ldr r5, [r0, #8]
+ldr r3, [r2]
+ldr r4, [r2, #4]
+ldr r5, [r2, #8]
 
  //ldr r6, [r3, DMA_HISR]
 // str r6, [r3, DMA_HIFCR]
@@ -191,9 +191,9 @@ L_002:
 add r6, r5, USART_DR
 add r4, r4, r3
  str r6, [r4, DMA_PAR] // dma write is USART address
- str r1, [r4, DMA_M0AR] //dma read is outputString
+ str r0, [r4, DMA_M0AR] //dma read is outputString
 
- str r2, [r4, DMA_NDTR] // number of n-bytes to write
+ str r1, [r4, DMA_NDTR] // number of n-bytes to write
  mov r5, #0x0440 // auto increment read address and keep fixed write address, mem-to-per
  movt r5, #0x0803
  str r5, [r4, DMA_CR] //configure dma transfer
@@ -205,7 +205,7 @@ add r4, r4, r3
  orr r5, r5, #1
  str r5, [r4, DMA_CR] //start dma transfer
 
- ldr r3, [r0, #8]
+ ldr r3, [r2, #8]
  ldr r6, [r3, USART_CR3]
  orr r6, r6, #0x80
  str r6, [r3, USART_CR3]
@@ -229,7 +229,7 @@ ldr r4, [r3, USART_CR3]
 bic r4, r4, #0x80
 str r4, [r3, USART_CR3]
 
-ldr r5, [r0]
+ ldr r5, [r2]
  ldr r6, [r5, DMA_HISR]
  str r6, [r5, DMA_HIFCR]
 
@@ -239,3 +239,33 @@ bx lr
 
 
 .size  WriteToUSARTDMA, .-WriteToUSARTDMA
+
+
+
+ .section  .text.WriteToUSART2DMA
+ .type WriteToUSART2DMA, %function
+  WriteToUSART2DMA:
+
+
+   push {r2-r4}
+   ldr r2, =DMA1_BASE
+   ldr r3, =DMA_S6CR
+   ldr r4, =USART2_BASE
+
+   push {r2-r4}
+
+   mov r2, sp
+
+   push {lr}
+
+   bl WriteToUSARTDMA
+
+   pop {lr}
+
+   pop {r2-r4}
+
+   pop {r2-r4}
+
+   bx lr
+
+ .size  WriteToUSART2DMA, .-WriteToUSART2DMA

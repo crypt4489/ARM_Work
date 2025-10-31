@@ -12,9 +12,9 @@
 .global spi1SetupDMAStreams
 .global spi1StartDMATransfer
 .global spi1StartDMAReception
-
-
-
+.global spi1ReceptionDMAPoll
+.global spiGlobalInterrupt
+.global spi1RXGlobalInterrupt
 /*
 
 struct FSM
@@ -49,9 +49,57 @@ standard “chip select” input and the slave is selected while NSS line is at 
 .section .text.spiGlobalInterrupt
 	.type spiGlobalInterrupt, %function
 spiGlobalInterrupt:
-
+//r0 DMA_BASE
+//r1 dma stream index
+push {r2-r6}
+cmp r1, #3
+ITTEE gt
+movgt r2, DMA_HISR
+movgt r3, DMA_HIFCR
+movle r2, DMA_LISR
+movle r3, DMA_LIFCR
+and r4, r1, #1
+and r5, r1, #2
+lsr r5, r5, #1
+mov r6, #16
+mul r5, r5, r6
+mov r6, #6
+mul r4, r4, r6
+mov r6, #0x3d
+add r4, r5, r4
+lsl r6, r6, r4
+ldr r4, [r0, r2]
+and r4, r4, r6
+str r4, [r0, r3]
+pop {r2-r6}
+bx lr
 
 .size spiGlobalInterrupt, .-spiGlobalInterrupt
+
+
+.section .text.spi1RXGlobalInterrupt
+	.type spi1RXGlobalInterrupt, %function
+spi1RXGlobalInterrupt:
+
+push {r0-r1}
+ldr r0, =NVIC_ICPR1
+ldr r1, [r0]
+orr r1, r1, #(0b1 << 24)
+str r1, [r0]
+
+ldr r0, =DMA2_BASE
+ldr r1, =0
+
+push {lr}
+
+bl spiGlobalInterrupt
+
+pop {lr}
+
+pop {r0-r1}
+bx lr
+
+.size spi1RXGlobalInterrupt, .-spi1RXGlobalInterrupt
 
 
 .section .text.spi1SetupDMAStreams
@@ -105,7 +153,7 @@ spi1StartDMAReception:
 
 //r0 ADDRESS OF DATA
 //r1 SIZE OF DATA
- push {r2-r3}
+ push {r2-r4}
  ldr r2, =DMA2_BASE  // load dma2 base
  ldr r3, =SPI1
  add r3, r3, SPI_DR
@@ -113,19 +161,20 @@ spi1StartDMAReception:
  str r0, [r2, DMA_S0M0AR] //dma read is ADDRESS OF DATA
 
  str r1, [r2, DMA_S0NDTR] // number of n-bytes to write
- mov r3, #0x0400 // auto increment read address and keep fixed write address, per-to-mem
+ mov r3, #0x0410 // auto increment read address and keep fixed write address, per-to-mem
  movt r3, #0x0600 //dma channel 3
- str r3, [r2, DMA_S0CR] //configure dma transfer
+ ldr r4, [r2, DMA_S0CR]
+ orr r4, r4, r3
+ str r4, [r2, DMA_S0CR] //configure dma transfer
  ldr r3, [r2, DMA_S0FCR]
  orr r3, r3, #(0b11)
  str r3, [r2, DMA_S0FCR] //full fifo
  ldr r3, [r2, DMA_S0CR]
  orr r3, r3, #1
  str r3, [r2, DMA_S0CR] //start dma transfer
- pop {r2-r3}
+ pop {r2-r4}
  bx lr
 .size spi1StartDMAReception, .-spi1StartDMAReception
-
 
 
 //
@@ -240,6 +289,23 @@ spi1Init:
 
 .size spi1Init, .-spi1Init
 
+
+.section .text.spi1ReceptionDMAPoll
+	.type spi1ReceptionDMAPoll, %function
+spi1ReceptionDMAPoll:
+  push {r0-r1}
+  ldr r0, =DMA2_BASE
+L_001:
+  ldr r1, [r0, DMA_LISR]
+  and r1, r1, #0x20
+  cmp r1, #0
+  beq L_001
+
+  orr r1, r1, #0x10
+  str r1, [r0, DMA_LIFCR]
+  pop {r0-r1}
+  bx lr
+.size spi1ReceptionDMAPoll, .-spi1ReceptionDMAPoll
 
 .section .text.spiImmediateCopy
 	.type spiImmediateCopy, %function

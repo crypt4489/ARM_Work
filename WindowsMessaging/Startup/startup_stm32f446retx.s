@@ -445,7 +445,7 @@ g_pfnVectors:
 	.thumb_set TIM7_IRQHandler,Default_Handler
 
 	.weak	DMA2_Stream0_IRQHandler
-	.thumb_set DMA2_Stream0_IRQHandler,Default_Handler
+	.thumb_set DMA2_Stream0_IRQHandler,SPIReceiveHandler
 
 	.weak	DMA2_Stream1_IRQHandler
 	.thumb_set DMA2_Stream1_IRQHandler,Default_Handler

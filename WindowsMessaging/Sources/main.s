@@ -6,9 +6,75 @@
 .include "addresses.s"
 .include "spi_addresses.s"
 
+
+.global SPIReceiveHandler
+
  .section .data
-STRING:
-    .asciz "AAAABBBBCCCCDDDDEEEEFFFFGGGG"
+STRING: .space 128
+
+STATUS:
+	.word 0x0
+USARTSIZE:
+	.word 0x0
+
+
+ .section  .text.SPIReceiveHandler
+ .type SPIReceiveHandler, %function
+SPIReceiveHandler:
+
+push {lr}
+bl spi1RXGlobalInterrupt
+pop {lr}
+
+ldr r0, =STATUS
+ldr r1, [r0]
+cmp r1, #0
+eor r1, r1, #1
+str r1, [r0]
+bne SPI_STATUS_1
+push {lr}
+ldr r0, =USARTSIZE
+ldr r1, [r0]
+ldr r0, =STRING
+
+bl spi1StartDMAReception
+
+ldr r0, =GPIOA_BASE
+ldr r1, =#(1 << 9)
+str r1, [r0, GPIO_BSRR]
+
+b RECEIVEEND
+SPI_STATUS_1:
+
+push {lr}
+
+ldr r0, =USARTSIZE
+
+ldr r1, [r0]
+
+push {r0}
+
+ldr r0, =STRING
+
+bl WriteToUSART2DMA
+
+ldr r0, =GPIOA_BASE
+ldr r1, =#(1 << 25)
+str r1, [r0, GPIO_BSRR]
+
+pop {r0}
+mov r1, #4
+
+bl spi1StartDMAReception
+
+
+RECEIVEEND:
+pop {lr}
+bx lr
+
+.size  SPIReceiveHandler, .-SPIReceiveHandler
+
+
 
  .section  .text.EstablishClockSignal
  .type EstablishClockSignal, %function
@@ -152,70 +218,20 @@ pop {lr}
 
   pop {r0-r7}
 
+  ldr r0, =NVIC_ISER1
+  ldr r1, [r0]
+  orr r1, r1, #(0b1 << 24)
+  str r1, [r0]
 
-
-  sub sp, sp, #4
-
-
-L_005:
-  mov r0, sp
+  ldr r0, =USARTSIZE
   mov r1, #4
 
   bl spi1StartDMAReception
 
-  ldr r0, =DMA2_BASE
-L_004:
-  ldr r1, [r0, DMA_LISR]
-  and r1, r1, #0x20
-  cmp r1, #0
-  beq L_004
 
-  orr r1, r1, #0x10
-  str r1, [r0, DMA_LIFCR]
-
-  ldr r0, =STRING
-  ldr r1, [sp]
-  mov r4, r1
-
-  bl spi1StartDMAReception
-
-  ldr r0, =GPIOA_BASE
-  ldr r1, =#(1 << 9)
-  str r1, [r0, GPIO_BSRR]
+L_005:
 
 
-
-
-  ldr r0, =DMA2_BASE
-L_006:
-  ldr r1, [r0, DMA_LISR]
-  and r1, r1, #0x20
-  cmp r1, #0
-  beq L_006
-
-  orr r1, r1, #0x10
-  str r1, [r0, DMA_LIFCR]
-
-  ldr r1, =DMA1_BASE
-  ldr r2, =DMA_S6CR
-  ldr r3, =USART2_BASE
-
-  push {r1-r3}
-
-  mov r0, sp
-
-  ldr r1, =STRING
-  mov r2, r4
-
-
-
-  bl WriteToUSARTDMA
-
-  pop {r1-r3}
-
-  ldr r0, =GPIOA_BASE
-  ldr r1, =#(1 << 25)
-  str r1, [r0, GPIO_BSRR]
 
   b L_005
 
