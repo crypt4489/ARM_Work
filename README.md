@@ -28,9 +28,10 @@ This is low-level firmware code: it talks straight to the CAN, SPI, USART, and D
 ## To Do
 
 1. **Finish SPI and USART.** Have both use DMA copy patterns and make them configurable in the way bxCAN is currently is. Create possible superstructure to allow receives to be managed by the driver, a la bxCAN driver.
-2. **Create SPI master session and make it configurable for different SPI hubs on STM MCU** Currently, window messaging passes note between to a USART to Winodws connection from a embedded Linux to STM SPI connection. Create SPI master session so can receive and transmit. 
+2. **Create SPI master session and make it configurable for different SPI hubs on STM MCU** Currently, window messaging passes note between to a USART to Winodws connection from a embedded Linux to STM SPI connection. Create a Full Duplex STM session and create multi slave setup with SPI2/SPI3
 3. **Generalize the CAN1/CAN2 selector pattern.** The `ENABLE/DISABLERXINTERRUPT` and TX equivalents take a magic `#0`/`#1` "which CAN" argument; consider deriving NVIC IRQ numbers from the CAN base address instead of duplicating call sites per-instance.
 4. **Resolve dead/duplicate code paths.** `can2FSMInit` has two `bx lr` in a row, and the commented-out `canBUSTransmit`/`canBUSReceive` block in `canbus.s` should either be removed or reconciled with the FSM-based equivalents.
 5. **Write a top-level integration example.** None of these files show the expected init order (clocks → GPIO → peripheral → NVIC → FSM) end-to-end for a board; a small `main`-equivalent or sequence diagram would make the driver call order unambiguous to a new reader.
-6. **Add NVIC specific layer to configure the ARM chip to user specifications***
+6. **Add NVIC specific layer to configure the ARM chip to user specifications**
 7. **Add RTC and RCC specific layer to configure clock and set up peripherals** Generate functions that will set up the RTC and RCC registers per the specification of user and by usage of the driver
+8. **Add Error Handling and navigation for bxCAN, USART, and SPI**
