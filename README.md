@@ -35,3 +35,5 @@ This is low-level firmware code: it talks straight to the CAN, SPI, USART, and D
 6. **Add NVIC specific layer to configure the ARM chip to user specifications**
 7. **Add RTC and RCC specific layer to configure clock and set up peripherals** Generate functions that will set up the RTC and RCC registers per the specification of user and by usage of the driver
 8. **Add Error Handling and navigation for bxCAN, USART, and SPI**
+9. **Create DMA, GPIO helper libraries as well**
+10. **Create unified error dispositon for all modules**
